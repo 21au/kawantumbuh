@@ -18,18 +18,22 @@ class _SplashScreenState extends State<SplashScreen> {
     super.initState();
     // Memulai animasi setelah delay kecil
     Future.delayed(const Duration(milliseconds: 500), () {
-      setState(() {
-        _opacity = 1.0;
-        _scale = 1.0;
-      });
+      if (mounted) {
+        setState(() {
+          _opacity = 1.0;
+          _scale = 1.0;
+        });
+      }
     });
 
     // Pindah ke halaman Login setelah 3 detik
     Future.delayed(const Duration(seconds: 3), () {
-      Navigator.pushReplacement(
-        context,
-        MaterialPageRoute(builder: (context) => const login.LoginScreen()),
-      );
+      if (mounted) {
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(builder: (context) => const login.LoginScreen()),
+        );
+      }
     });
   }
 
@@ -45,30 +49,33 @@ class _SplashScreenState extends State<SplashScreen> {
           child: AnimatedOpacity(
             opacity: _opacity,
             duration: const Duration(seconds: 1),
-            child: const Column(
+            child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                // Icon sementara, nanti bisa diganti Logo KawanTumbuh
-                Icon(
-                  Icons.child_care_rounded,
-                  size: 100,
-                  color: AppColors.softPink,
+                // 👇 INI BAGIAN YANG DIUBAH: Menggunakan gambar logo
+                Image.asset(
+                  'assets/images/logo.png', // Pastikan nama file sesuai dengan yang kamu simpan
+                  width: 210, // Ukuran logo bisa kamu ubah (misal: 100 atau 150)
+                  height: 210,
+                  fit: BoxFit.contain, // Memastikan gambar tidak terpotong
                 ),
-                SizedBox(height: 20),
-                Text(
+                // 👆 BATAS UBAHAN
+                
+                const SizedBox(height: 20),
+                const Text(
                   "KawanTumbuh",
                   style: TextStyle(
-                    fontSize: 32,
+                    fontSize: 38,
                     fontWeight: FontWeight.bold,
                     color: AppColors.lightPink,
                     letterSpacing: 1.5,
                   ),
                 ),
-                SizedBox(height: 8),
-                Text(
+                const SizedBox(height: 8),
+                const Text(
                   "Tumbuh Bersama, Lebih Bermakna",
                   style: TextStyle(
-                    fontSize: 14,
+                    fontSize: 17,
                     color: AppColors.softPink,
                     fontStyle: FontStyle.italic,
                   ),

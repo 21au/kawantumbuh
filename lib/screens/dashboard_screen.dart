@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:supabase_flutter/supabase_flutter.dart'; // Wajib ditambahkan
 import 'package:kawantumbuh/screens/statistik_pertumbuhan_screen.dart';
 import 'package:kawantumbuh/utils/app_colors.dart';
 import 'anak_screen.dart'; 
@@ -18,9 +19,52 @@ class _DashboardScreenState extends State<DashboardScreen> {
   final Color childCardColor = const Color(0xFFB88E9B);
   final Color articleCardColor = const Color(0xFFEAA6A9);
 
+  // 1. Siapkan variabel untuk menyimpan nama pengguna
+  String _userName = "Bunda"; 
+  bool _isLoadingName = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _fetchUserName(); // Panggil fungsi ambil nama saat layar dibuka
+  }
+
+  // 2. Fungsi untuk mengambil nama dari Supabase
+  void _fetchUserName() {
+    final user = Supabase.instance.client.auth.currentUser;
+    if (user != null) {
+      // Ambil data 'full_name' dari user_metadata yang kita simpan pas register
+      final fullName = user.userMetadata?['full_name'] as String?;
+      if (fullName != null && fullName.isNotEmpty) {
+        setState(() {
+          // Kita tambahkan kata sapaan "Ibu " atau "Bunda " di depannya
+          _userName = "Ibu $fullName";
+          _isLoadingName = false;
+        });
+      } else {
+        setState(() {
+          _userName = "Ibu Pengguna"; // Jaga-jaga kalau namanya kosong
+          _isLoadingName = false;
+        });
+      }
+    }
+  }
+
+  // Fungsi tambahan untuk memformat tanggal hari ini
+  String _getFormattedDate() {
+    final now = DateTime.now();
+    final months = [
+      '', 'Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni',
+      'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'
+    ];
+    final days = [
+      '', 'Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu', 'Minggu'
+    ];
+    return "${days[now.weekday]}, ${now.day} ${months[now.month]} ${now.year}";
+  }
+
   @override
   Widget build(BuildContext context) {
-    // Scaffold di sini TIDAK boleh pakai bottomNavigationBar lagi
     return Scaffold(
       backgroundColor: AppColors.lightPink,
       body: SingleChildScrollView(
@@ -32,7 +76,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
             _buildMenuGrid(),
             const SizedBox(height: 20),
             _buildArticleSection(),
-            const SizedBox(height: 100), // Beri space bawah agar tidak tertutup Navbar Wrapper
+            const SizedBox(height: 100), 
           ],
         ),
       ),
@@ -60,9 +104,16 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   const Text("Selamat Datang! 👋", style: TextStyle(color: Colors.white70, fontSize: 14)),
-                  Text("Ibu Audrey", style: TextStyle(color: highlightText, fontSize: 24, fontWeight: FontWeight.bold)),
+                  // 3. Tampilkan nama yang sudah diambil dari database
+                  _isLoadingName 
+                      ? const SizedBox(
+                          height: 20, width: 20, 
+                          child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2)
+                        )
+                      : Text(_userName, style: TextStyle(color: highlightText, fontSize: 24, fontWeight: FontWeight.bold)),
                   const SizedBox(height: 4),
-                  const Text("Kamis, 5 Februari 2026", style: TextStyle(color: Colors.white54, fontSize: 12)),
+                  // Tanggal juga saya buat otomatis berubah sesuai hari ini
+                  Text(_getFormattedDate(), style: const TextStyle(color: Colors.white54, fontSize: 12)),
                 ],
               ),
               Container(
@@ -75,7 +126,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
             ],
           ),
           const SizedBox(height: 25),
-          // Navigasi internal tetap boleh pakai Navigator.push untuk detail
           GestureDetector(
             onTap: () => Navigator.push(context, MaterialPageRoute(builder: (context) => const AnakScreen())),
             child: Container(
@@ -108,7 +158,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
     );
   }
 
-  // --- MENU GRID & ARTICLE (Tetap sama seperti kodemu sebelumnya) ---
+  // --- MENU GRID & ARTICLE ---
   Widget _buildMenuGrid() {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 20),
@@ -127,15 +177,13 @@ class _DashboardScreenState extends State<DashboardScreen> {
   Widget _buildMenuCard(IconData icon, String title, String subtitle) {
     double width = (MediaQuery.of(context).size.width - 55) / 2;
     return GestureDetector(
-      // Di dalam _buildMenuCard
-onTap: () {
-  if (title == "Tips Sehat") {
-    Navigator.push(context, MaterialPageRoute(builder: (context) => const TipsScreen()));
-  } else if (title == "Pertumbuhan") {
-    // Diarahkan ke halaman statistik khusus, bukan ke AnakScreen (Navbar)
-    Navigator.push(context, MaterialPageRoute(builder: (context) => const StatistikPertumbuhanScreen()));
-  }
-},
+      onTap: () {
+        if (title == "Tips Sehat") {
+          Navigator.push(context, MaterialPageRoute(builder: (context) => const TipsScreen()));
+        } else if (title == "Pertumbuhan") {
+          Navigator.push(context, MaterialPageRoute(builder: (context) => const StatistikPertumbuhanScreen()));
+        }
+      },
       child: Container(
         width: width,
         padding: const EdgeInsets.all(15),

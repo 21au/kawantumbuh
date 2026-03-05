@@ -1,10 +1,11 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart'; // Wajib ditambahkan untuk membatasi input hanya angka
+import 'package:flutter/services.dart';
+import 'package:supabase_flutter/supabase_flutter.dart'; // Wajib import ini
 import 'package:kawantumbuh/utils/app_colors.dart';
 import 'package:kawantumbuh/widgets/custom_input.dart';
-import 'register_screen.dart'; // Import halaman register
-import 'forgot_password_screen.dart'; // Import halaman lupa password (kita buat setelah ini)
-import 'dashboard_screen.dart'; // Tambahkan baris ini
+import 'register_screen.dart';
+import 'forgot_password_screen.dart';
+import 'dashboard_screen.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -14,11 +15,72 @@ class LoginScreen extends StatefulWidget {
 }
 
 class _LoginScreenState extends State<LoginScreen> {
-   final Color bgColor = const Color(0xFFFFD6D9); // Pink pastel background
-  final Color textColor = const Color(0xFF2A365D); // Biru tua untuk teks
-  final Color fieldColor = const Color(0xFFEAA6A9); // Pink sedikit gelap untuk kolom
-  final Color btnColor = const Color(0xFF1B75A6); // Biru untuk tombol
+  final Color bgColor = const Color(0xFFFFD6D9);
+  final Color textColor = const Color(0xFF2A365D);
+  final Color fieldColor = const Color(0xFFEAA6A9);
+  final Color btnColor = const Color(0xFF1B75A6);
   bool _rememberMe = false;
+
+  // 1. Siapkan Controller untuk menangkap teks ketikan pengguna
+  final TextEditingController _phoneController = TextEditingController();
+  final TextEditingController _passwordController = TextEditingController();
+  
+  // 2. Siapkan efek loading dan panggil Supabase
+  bool _isLoading = false;
+  final supabase = Supabase.instance.client;
+
+  // 3. Fungsi untuk mengeksekusi Login ke Supabase
+  Future<void> _login() async {
+    // Validasi kalau kolom kosong
+    if (_phoneController.text.isEmpty || _passwordController.text.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("No HP dan Password harus diisi!"), backgroundColor: Colors.red),
+      );
+      return;
+    }
+
+    setState(() => _isLoading = true);
+
+    try {
+      final phone = _phoneController.text.trim();
+      final password = _passwordController.text.trim();
+      
+      // "Trik Ninja": Jadikan No HP sebagai Email palsu agar gratis
+      final ninjaEmail = '$phone@kawantumbuh.com';
+
+      // Proses tembak ke Supabase
+      await supabase.auth.signInWithPassword(
+        email: ninjaEmail,
+        password: password,
+      );
+
+      // Kalau sukses, pindah ke Dashboard
+      if (mounted) {
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(builder: (context) => const DashboardScreen()), // Pastikan nama classnya benar
+        );
+      }
+    } on AuthException catch (e) {
+      // Muncul error kalau password salah atau akun belum terdaftar
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text("Gagal masuk: ${e.message}"), backgroundColor: Colors.red),
+      );
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("Terjadi kesalahan sistem"), backgroundColor: Colors.red),
+      );
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
+    }
+  }
+
+  @override
+  void dispose() {
+    _phoneController.dispose();
+    _passwordController.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -49,7 +111,7 @@ class _LoginScreenState extends State<LoginScreen> {
               ),
               const SizedBox(height: 40),
               
-              // --- INPUT NO HP (Hanya Angka) ---
+              // --- INPUT NO HP ---
               const Padding(
                 padding: EdgeInsets.only(bottom: 8.0, left: 4.0),
                 child: Text(
@@ -59,16 +121,17 @@ class _LoginScreenState extends State<LoginScreen> {
               ),
               Container(
                 decoration: BoxDecoration(
-                  color: const Color(0xFFEAA6A9), // Sesuaikan dengan warna custom input-mu
+                  color: fieldColor, 
                   borderRadius: BorderRadius.circular(10),
                   boxShadow: [
                     BoxShadow(color: Colors.black.withOpacity(0.15), blurRadius: 4, offset: const Offset(0, 3)),
                   ],
                 ),
                 child: TextField(
-                  keyboardType: TextInputType.number, // Memunculkan keyboard angka di HP
+                  controller: _phoneController, // Sambungkan Controller di sini
+                  keyboardType: TextInputType.number,
                   inputFormatters: [
-                    FilteringTextInputFormatter.digitsOnly, // Mencegah huruf diketik (walau pakai keyboard fisik)
+                    FilteringTextInputFormatter.digitsOnly,
                   ],
                   style: const TextStyle(color: AppColors.navyDark),
                   decoration: InputDecoration(
@@ -82,11 +145,13 @@ class _LoginScreenState extends State<LoginScreen> {
               
               const SizedBox(height: 25),
               
-              // Input Password (Tetap pakai CustomInput milikmu)
-              const CustomInput(
+              // --- INPUT PASSWORD ---
+              // PERHATIAN: Kamu harus pastikan CustomInput milikmu bisa menerima parameter 'controller'
+              CustomInput(
                 label: "Password",
                 hint: "*********",
                 isPassword: true,
+                controller: _passwordController, // Sambungkan Controller di sini
               ),
               
               const SizedBox(height: 15),
@@ -109,7 +174,6 @@ class _LoginScreenState extends State<LoginScreen> {
                   ),
                   TextButton(
                     onPressed: () {
-                      // Pindah ke halaman Lupa Password
                       Navigator.push(
                         context,
                         MaterialPageRoute(builder: (context) => const ForgotPasswordScreen()),
@@ -125,25 +189,27 @@ class _LoginScreenState extends State<LoginScreen> {
               
               const SizedBox(height: 30),
               
-              // Tombol Masuk
+              // --- TOMBOL MASUK ---
               SizedBox(
                 width: double.infinity,
+                height: 50, // Sesuaikan tingginya biar proporsional
                 child: ElevatedButton(
-                  onPressed: () {
-                    // Trik Frontend: Langsung pindah ke Dashboard!
-                    Navigator.pushReplacement(
-                      context,
-                      MaterialPageRoute(builder: (context) => DashboardScreen()),
-                    );
-                  },
+                  onPressed: _isLoading ? null : _login, // Jalankan fungsi _login saat diklik
                   style: ElevatedButton.styleFrom(
                     backgroundColor: AppColors.oceanBlue,
-                    // ... (sisa kodenya tetap sama) ...
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(10), // Samakan dengan TextField
+                    ),
                   ),
-                  child: const Text(
-                    "Masuk",
-                    style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold),
-                  ),
+                  child: _isLoading
+                      ? const SizedBox(
+                          height: 20, width: 20, 
+                          child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2)
+                        )
+                      : const Text(
+                          "Masuk",
+                          style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold),
+                        ),
                 ),
               ),
 
@@ -159,7 +225,6 @@ class _LoginScreenState extends State<LoginScreen> {
                   ),
                   GestureDetector(
                     onTap: () {
-                      // Pindah ke halaman Register
                       Navigator.push(
                         context,
                         MaterialPageRoute(builder: (context) => const RegisterScreen()),

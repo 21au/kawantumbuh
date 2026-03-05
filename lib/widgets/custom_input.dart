@@ -5,12 +5,14 @@ class CustomInput extends StatelessWidget {
   final String label;
   final String hint;
   final bool isPassword;
+  final TextEditingController? controller; // 1. Tambahkan variabel controller ini
 
   const CustomInput({
     super.key,
     required this.label,
     required this.hint,
     this.isPassword = false,
+    this.controller, // 2. Daftarkan di sini agar bisa dipanggil
   });
 
   @override
@@ -38,6 +40,7 @@ class CustomInput extends StatelessWidget {
             ],
           ),
           child: TextField(
+            controller: controller, // 3. Sambungkan ke TextField-nya
             obscureText: isPassword,
             decoration: InputDecoration(
               hintText: hint,

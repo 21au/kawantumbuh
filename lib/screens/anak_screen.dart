@@ -84,7 +84,9 @@ class _AnakScreenState extends State<AnakScreen> {
                   _buildRiwayatHeader(context),
                   const SizedBox(height: 15),
                   _buildRiwayatList(),
-                  const SizedBox(height: 40),
+                  
+                  // 👇 INI PERBAIKANNYA: Ganjalan agar tidak ketutup Navbar
+                  const SizedBox(height: 120), 
                 ],
               ),
             ),
@@ -268,7 +270,6 @@ class _AnakScreenState extends State<AnakScreen> {
             ),
           ),
           const SizedBox(height: 15),
-          // --- REKOMENDASI DIKEMBALIKAN ---
           Container(
             padding: const EdgeInsets.all(15),
             decoration: BoxDecoration(color: oceanBlue.withOpacity(0.1), borderRadius: BorderRadius.circular(15)),
@@ -362,7 +363,6 @@ class _AnakScreenState extends State<AnakScreen> {
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
         Text("Riwayat Pengukuran", style: TextStyle(color: navyBackground, fontSize: 18, fontWeight: FontWeight.bold)),
-        // --- TOMBOL DIGANTI JADI "CATAT" ---
         ElevatedButton.icon(
           onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (context) => const CatatPertumbuhanScreen())),
           icon: const Icon(Icons.add, size: 16, color: Colors.white),

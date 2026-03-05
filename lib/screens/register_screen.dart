@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart'; // Untuk filter input angka
+import 'package:supabase_flutter/supabase_flutter.dart'; // Wajib
 import 'package:kawantumbuh/screens/login_screen.dart';
 
 class RegisterScreen extends StatefulWidget {
@@ -9,17 +11,93 @@ class RegisterScreen extends StatefulWidget {
 }
 
 class _RegisterScreenState extends State<RegisterScreen> {
-  // Warna utama yang diambil dari desainmu
-  final Color bgColor = const Color(0xFFFFD6D9); // Pink pastel background
-  final Color textColor = const Color(0xFF2A365D); // Biru tua untuk teks
-  final Color fieldColor = const Color(0xFFEAA6A9); // Pink sedikit gelap untuk kolom
-  final Color btnColor = const Color(0xFF1B75A6); // Biru untuk tombol
+  final Color bgColor = const Color(0xFFFFD6D9);
+  final Color textColor = const Color(0xFF2A365D);
+  final Color fieldColor = const Color(0xFFEAA6A9);
+  final Color btnColor = const Color(0xFF1B75A6);
+
+  // 1. Siapkan Controller untuk menangkap teks
+  final TextEditingController _phoneController = TextEditingController();
+  final TextEditingController _nameController = TextEditingController();
+  final TextEditingController _passwordController = TextEditingController();
+
+  // 2. Siapkan efek loading dan panggil Supabase
+  bool _isLoading = false;
+  final supabase = Supabase.instance.client;
+
+  // 3. Fungsi untuk mengeksekusi Daftar Akun ke Supabase
+  Future<void> _register() async {
+    // Validasi agar kolom tidak ada yang kosong
+    if (_phoneController.text.isEmpty || 
+        _nameController.text.isEmpty || 
+        _passwordController.text.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("Semua kolom harus diisi!"), backgroundColor: Colors.red),
+      );
+      return;
+    }
+
+    // Validasi password minimal 6 karakter
+    if (_passwordController.text.length < 6) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("Password minimal 6 karakter!"), backgroundColor: Colors.red),
+      );
+      return;
+    }
+
+    setState(() => _isLoading = true);
+
+    try {
+      final phone = _phoneController.text.trim();
+      final name = _nameController.text.trim();
+      final password = _passwordController.text.trim();
+      
+      // "Trik Ninja": Jadikan No HP sebagai Email palsu
+      final ninjaEmail = '$phone@kawantumbuh.com';
+
+      // Proses tembak ke Supabase untuk daftar
+      await supabase.auth.signUp(
+        email: ninjaEmail,
+        password: password,
+        // Menyimpan data tambahan seperti Nama
+        data: {'full_name': name, 'phone': phone},
+      );
+
+      // Kalau sukses daftar, kembali ke halaman Login dengan pesan sukses
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text("Pendaftaran berhasil! Silakan Login."), backgroundColor: Colors.green),
+        );
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(builder: (context) => const LoginScreen()),
+        );
+      }
+    } on AuthException catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text("Gagal mendaftar: ${e.message}"), backgroundColor: Colors.red),
+      );
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("Terjadi kesalahan sistem"), backgroundColor: Colors.red),
+      );
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
+    }
+  }
+
+  @override
+  void dispose() {
+    _phoneController.dispose();
+    _nameController.dispose();
+    _passwordController.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: bgColor,
-      // SingleChildScrollView agar layar bisa di-scroll (tidak error kalau keyboard muncul)
       body: SafeArea(
         child: SingleChildScrollView(
           padding: const EdgeInsets.symmetric(horizontal: 30.0, vertical: 40.0),
@@ -27,7 +105,6 @@ class _RegisterScreenState extends State<RegisterScreen> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               const SizedBox(height: 20),
-              // Judul
               Text(
                 'Silakan Daftar!',
                 style: TextStyle(
@@ -37,7 +114,6 @@ class _RegisterScreenState extends State<RegisterScreen> {
                 ),
               ),
               const SizedBox(height: 10),
-              // Sub-judul
               Text(
                 'Jika anda belum memiliki akun daftar\ndisini',
                 style: TextStyle(
@@ -50,17 +126,28 @@ class _RegisterScreenState extends State<RegisterScreen> {
 
               // Form No HP/Whatsapp
               _buildLabel('No HP/Whatsapp'),
-              _buildTextField(hintText: '081234567890'), // Contoh nomor, nanti bisa diganti sesuai kebutuhan
+              _buildTextField(
+                hintText: '081234567890', 
+                controller: _phoneController, // Sambungkan controller
+                isPhone: true, // Beri tanda ini form nomor HP
+              ),
               const SizedBox(height: 20),
 
               // Form Nama
               _buildLabel('Nama'),
-              _buildTextField(hintText: 'Audrey Pramudita S'),
+              _buildTextField(
+                hintText: 'Bunda Sarah', 
+                controller: _nameController, // Sambungkan controller
+              ),
               const SizedBox(height: 20),
 
               // Form Password
               _buildLabel('Password'),
-              _buildTextField(hintText: '********', isPassword: true),
+              _buildTextField(
+                hintText: 'minimal 6 karakter', 
+                isPassword: true,
+                controller: _passwordController, // Sambungkan controller
+              ),
               const SizedBox(height: 40),
 
               // Tombol Daftar
@@ -75,17 +162,20 @@ class _RegisterScreenState extends State<RegisterScreen> {
                     ),
                     elevation: 2,
                   ),
-                  onPressed: () {
-                    // Nanti kita isi aksi untuk mengirim data ke backend
-                  },
-                  child: Text(
-                    'Daftar',
-                    style: TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.bold,
-                      color: bgColor, // Warna teks tombol menyesuaikan pink background
-                    ),
-                  ),
+                  onPressed: _isLoading ? null : _register, // Eksekusi fungsi register
+                  child: _isLoading 
+                    ? const SizedBox(
+                        height: 20, width: 20, 
+                        child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2)
+                      )
+                    : Text(
+                        'Daftar',
+                        style: TextStyle(
+                          fontSize: 18, // Sedikit dibesarkan biar sama dengan login
+                          fontWeight: FontWeight.bold,
+                          color: Colors.white, // Ubah ke putih biar kontras
+                        ),
+                      ),
                 ),
               ),
               
@@ -101,11 +191,10 @@ class _RegisterScreenState extends State<RegisterScreen> {
                   ),
                   GestureDetector(
                     onTap: () {
-                      Navigator.push(
+                      Navigator.pushReplacement(
                         context,
                         MaterialPageRoute(builder: (context) => const LoginScreen()),
-                      );// Nanti di sini kita arahkan ke halaman Login
-                      print("Pergi ke halaman login");
+                      );
                     },
                     child: Text(
                       'Login',
@@ -113,7 +202,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                         color: btnColor, 
                         fontSize: 14, 
                         fontWeight: FontWeight.bold,
-                        decoration: TextDecoration.underline, // Memberi garis bawah agar jelas bisa diklik
+                        decoration: TextDecoration.underline,
                       ),
                     ),
                   ),
@@ -127,7 +216,6 @@ class _RegisterScreenState extends State<RegisterScreen> {
   }
 
   // --- WIDGET BANTUAN --- 
-  // Agar kode lebih rapi, kita pisahkan kode pembuatan Label Teks di sini
   Widget _buildLabel(String text) {
     return Padding(
       padding: const EdgeInsets.only(bottom: 8.0, left: 4.0),
@@ -142,27 +230,35 @@ class _RegisterScreenState extends State<RegisterScreen> {
     );
   }
 
-  // Widget Bantuan untuk Kolom Isian (TextField) beserta efek bayangannya (Shadow)
-  Widget _buildTextField({required String hintText, bool isPassword = false}) {
+  // Widget Bantuan dimodifikasi agar bisa menerima controller dan format angka
+  Widget _buildTextField({
+    required String hintText, 
+    bool isPassword = false, 
+    bool isPhone = false,
+    TextEditingController? controller,
+  }) {
     return Container(
       decoration: BoxDecoration(
         color: fieldColor,
         borderRadius: BorderRadius.circular(10),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.15), // Efek bayangan seperti di desain
+            color: Colors.black.withOpacity(0.15),
             blurRadius: 4,
             offset: const Offset(0, 3),
           ),
         ],
       ),
       child: TextField(
-        obscureText: isPassword, // Kalau password, teksnya jadi bintang-bintang
+        controller: controller, // Pemasangan controller
+        obscureText: isPassword,
+        keyboardType: isPhone ? TextInputType.number : TextInputType.text, // Munculkan numpad jika HP
+        inputFormatters: isPhone ? [FilteringTextInputFormatter.digitsOnly] : null, // Blokir huruf jika HP
         style: TextStyle(color: textColor),
         decoration: InputDecoration(
           hintText: hintText,
           hintStyle: TextStyle(color: textColor.withOpacity(0.6), fontSize: 14),
-          border: InputBorder.none, // Menghilangkan garis bawaan flutter
+          border: InputBorder.none,
           contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
         ),
       ),
