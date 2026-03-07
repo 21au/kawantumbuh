@@ -7,12 +7,13 @@ class DetailTipsScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // Warna tema agar konsisten
-    const Color navyBackground = Color(0xFF1A2B4C);
-    const Color offWhitePink = Color.fromARGB(255, 231, 183, 187);
+    // --- PALET WARNA UTAMA (Disamakan dengan layar sebelumnya) ---
+    final Color navyDark = const Color(0xFF102C57);
+    final Color softPink = const Color(0xFFFFEAEA); 
+    final Color highlightPink = const Color(0xFFEBA9A9); 
 
     return Scaffold(
-      backgroundColor: offWhitePink,
+      backgroundColor: softPink, // Background utama
       // Gunakan AppBar sederhana agar tombol back selalu responsif
       appBar: AppBar(
         backgroundColor: Colors.transparent,
@@ -20,9 +21,9 @@ class DetailTipsScreen extends StatelessWidget {
         leading: Padding(
           padding: const EdgeInsets.all(8.0),
           child: CircleAvatar(
-            backgroundColor: navyBackground,
+            backgroundColor: navyDark,
             child: IconButton(
-              icon: const Icon(Icons.arrow_back_ios_new, color: Color.fromARGB(255, 235, 185, 185), size: 18),
+              icon: Icon(Icons.arrow_back_ios_new, color: softPink, size: 18),
               onPressed: () => Navigator.maybePop(context),
             ),
           ),
@@ -40,12 +41,11 @@ class DetailTipsScreen extends StatelessWidget {
               width: double.infinity,
               height: 300,
               fit: BoxFit.cover,
-              // KUNCI: Batasi memori gambar di sini
               cacheWidth: 600, 
               errorBuilder: (context, error, stackTrace) => Container(
                 height: 300,
-                color: Colors.grey[300],
-                child: const Icon(Icons.broken_image, size: 50),
+                color: highlightPink, // Pengganti warna abu-abu
+                child: Icon(Icons.image, size: 50, color: softPink),
               ),
             ),
             
@@ -56,8 +56,8 @@ class DetailTipsScreen extends StatelessWidget {
                 children: [
                   Text(
                     item['category']?.toUpperCase() ?? 'TIPS',
-                    style: const TextStyle(
-                      color: Color(0xFFF69C91),
+                    style: TextStyle(
+                      color: navyDark.withOpacity(0.6),
                       fontWeight: FontWeight.bold,
                       letterSpacing: 1.2,
                       fontSize: 12,
@@ -66,8 +66,8 @@ class DetailTipsScreen extends StatelessWidget {
                   const SizedBox(height: 10),
                   Text(
                     item['title'] ?? '',
-                    style: const TextStyle(
-                      color: navyBackground,
+                    style: TextStyle(
+                      color: navyDark,
                       fontSize: 24,
                       fontWeight: FontWeight.bold,
                       height: 1.2,
@@ -76,26 +76,26 @@ class DetailTipsScreen extends StatelessWidget {
                   const SizedBox(height: 15),
                   Row(
                     children: [
-                      const Icon(Icons.access_time, size: 16, color: Colors.grey),
+                      Icon(Icons.access_time, size: 16, color: navyDark.withOpacity(0.5)),
                       const SizedBox(width: 5),
-                      Text(item['time'] ?? '5 mnt', style: const TextStyle(color: Colors.grey)),
+                      Text(item['time'] ?? '5 mnt', style: TextStyle(color: navyDark.withOpacity(0.5))),
                     ],
                   ),
-                  const Padding(
-                    padding: EdgeInsets.symmetric(vertical: 20),
-                    child: Divider(),
+                  Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 20),
+                    child: Divider(color: navyDark.withOpacity(0.2)),
                   ),
-                  // Teks Isi Artikel (Dummy)
+                  // Teks Isi Artikel
                   Text(
                     item['desc'] ?? '',
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontSize: 18,
                       fontWeight: FontWeight.w600,
-                      color: navyBackground,
+                      color: navyDark,
                     ),
                   ),
                   const SizedBox(height: 15),
-                  const Text(
+                  Text(
                     "Menjaga kesehatan buah hati adalah prioritas utama setiap orang tua. "
                     "Pastikan Anda selalu berkonsultasi dengan tenaga medis profesional "
                     "untuk mendapatkan penanganan yang sesuai dengan kebutuhan spesifik anak Anda.\n\n"
@@ -104,7 +104,7 @@ class DetailTipsScreen extends StatelessWidget {
                     style: TextStyle(
                       fontSize: 16,
                       height: 1.6,
-                      color: Colors.black87,
+                      color: navyDark.withOpacity(0.9), // Pengganti Colors.black87
                     ),
                   ),
                   const SizedBox(height: 100), // Ruang agar tidak mentok bawah

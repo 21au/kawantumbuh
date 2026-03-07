@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart'; // Untuk filter input angka
-import 'package:supabase_flutter/supabase_flutter.dart'; // Wajib
+import 'package:flutter/services.dart'; 
+import 'package:supabase_flutter/supabase_flutter.dart'; 
 import 'package:kawantumbuh/screens/login_screen.dart';
 
 class RegisterScreen extends StatefulWidget {
@@ -11,23 +11,20 @@ class RegisterScreen extends StatefulWidget {
 }
 
 class _RegisterScreenState extends State<RegisterScreen> {
-  final Color bgColor = const Color(0xFFFFD6D9);
-  final Color textColor = const Color(0xFF2A365D);
-  final Color fieldColor = const Color(0xFFEAA6A9);
-  final Color btnColor = const Color(0xFF1B75A6);
+  // --- PALET WARNA REVISI SESUAI LOGIN ---
+  final Color bgColor = const Color(0xFFFFEAEA);     // Background Soft Pink
+  final Color navyDark = const Color(0xFF102C57);    // Navy Gelap
+  final Color fieldColor = const Color(0xFFF5CBCB);  // Pink Input Field
 
-  // 1. Siapkan Controller untuk menangkap teks
   final TextEditingController _phoneController = TextEditingController();
   final TextEditingController _nameController = TextEditingController();
   final TextEditingController _passwordController = TextEditingController();
 
-  // 2. Siapkan efek loading dan panggil Supabase
   bool _isLoading = false;
+  bool _obscureText = true; // Untuk fitur intip password
   final supabase = Supabase.instance.client;
 
-  // 3. Fungsi untuk mengeksekusi Daftar Akun ke Supabase
   Future<void> _register() async {
-    // Validasi agar kolom tidak ada yang kosong
     if (_phoneController.text.isEmpty || 
         _nameController.text.isEmpty || 
         _passwordController.text.isEmpty) {
@@ -37,7 +34,6 @@ class _RegisterScreenState extends State<RegisterScreen> {
       return;
     }
 
-    // Validasi password minimal 6 karakter
     if (_passwordController.text.length < 6) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text("Password minimal 6 karakter!"), backgroundColor: Colors.red),
@@ -52,18 +48,14 @@ class _RegisterScreenState extends State<RegisterScreen> {
       final name = _nameController.text.trim();
       final password = _passwordController.text.trim();
       
-      // "Trik Ninja": Jadikan No HP sebagai Email palsu
       final ninjaEmail = '$phone@kawantumbuh.com';
 
-      // Proses tembak ke Supabase untuk daftar
       await supabase.auth.signUp(
         email: ninjaEmail,
         password: password,
-        // Menyimpan data tambahan seperti Nama
         data: {'full_name': name, 'phone': phone},
       );
 
-      // Kalau sukses daftar, kembali ke halaman Login dengan pesan sukses
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text("Pendaftaran berhasil! Silakan Login."), backgroundColor: Colors.green),
@@ -99,138 +91,140 @@ class _RegisterScreenState extends State<RegisterScreen> {
     return Scaffold(
       backgroundColor: bgColor,
       body: SafeArea(
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.symmetric(horizontal: 30.0, vertical: 40.0),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const SizedBox(height: 20),
-              Text(
-                'Silakan Daftar!',
-                style: TextStyle(
-                  fontSize: 35,
-                  fontWeight: FontWeight.bold,
-                  color: textColor,
-                ),
-              ),
-              const SizedBox(height: 10),
-              Text(
-                'Jika anda belum memiliki akun daftar\ndisini',
-                style: TextStyle(
-                  fontSize: 17,
-                  color: textColor,
-                  height: 1.4,
-                ),
-              ),
-              const SizedBox(height: 40),
-
-              // Form No HP/Whatsapp
-              _buildLabel('No HP/Whatsapp'),
-              _buildTextField(
-                hintText: '081234567890', 
-                controller: _phoneController, // Sambungkan controller
-                isPhone: true, // Beri tanda ini form nomor HP
-              ),
-              const SizedBox(height: 20),
-
-              // Form Nama
-              _buildLabel('Nama'),
-              _buildTextField(
-                hintText: 'Bunda Sarah', 
-                controller: _nameController, // Sambungkan controller
-              ),
-              const SizedBox(height: 20),
-
-              // Form Password
-              _buildLabel('Password'),
-              _buildTextField(
-                hintText: 'minimal 6 karakter', 
-                isPassword: true,
-                controller: _passwordController, // Sambungkan controller
-              ),
-              const SizedBox(height: 40),
-
-              // Tombol Daftar
-              SizedBox(
-                width: double.infinity,
-                height: 50,
-                child: ElevatedButton(
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: btnColor,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(15),
-                    ),
-                    elevation: 2,
+        child: Center(
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.symmetric(horizontal: 35.0, vertical: 20.0),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Silakan Daftar!',
+                  style: TextStyle(
+                    fontSize: 32,
+                    fontWeight: FontWeight.bold,
+                    color: navyDark,
                   ),
-                  onPressed: _isLoading ? null : _register, // Eksekusi fungsi register
-                  child: _isLoading 
-                    ? const SizedBox(
-                        height: 20, width: 20, 
-                        child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2)
-                      )
-                    : Text(
-                        'Daftar',
-                        style: TextStyle(
-                          fontSize: 18, // Sedikit dibesarkan biar sama dengan login
-                          fontWeight: FontWeight.bold,
-                          color: Colors.white, // Ubah ke putih biar kontras
+                ),
+                const SizedBox(height: 10),
+                Text(
+                  'Daftarkan akun anda untuk mulai memantau tumbuh kembang si kecil.',
+                  style: TextStyle(
+                    fontSize: 15,
+                    color: navyDark.withOpacity(0.7),
+                    height: 1.4,
+                  ),
+                ),
+                const SizedBox(height: 40),
+
+                // Form No HP
+                _buildLabel('No HP/Whatsapp'),
+                _buildTextField(
+                  hintText: '081234567890', 
+                  controller: _phoneController, 
+                  isPhone: true,
+                ),
+                const SizedBox(height: 20),
+
+                // Form Nama
+                _buildLabel('Nama Bunda'),
+                _buildTextField(
+                  hintText: 'Bunda Sarah', 
+                  controller: _nameController, 
+                ),
+                const SizedBox(height: 20),
+
+                // Form Password
+                _buildLabel('Password'),
+                _buildTextField(
+                  hintText: 'minimal 6 karakter', 
+                  isPassword: true,
+                  controller: _passwordController,
+                ),
+                const SizedBox(height: 40),
+
+                // Tombol Daftar
+                SizedBox(
+                  width: double.infinity,
+                  height: 55,
+                  child: ElevatedButton(
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: navyDark,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(15),
+                      ),
+                      elevation: 4,
+                      shadowColor: navyDark.withOpacity(0.4),
+                    ),
+                    onPressed: _isLoading ? null : _register,
+                    child: _isLoading 
+                      ? const SizedBox(
+                          height: 24, width: 24, 
+                          child: CircularProgressIndicator(color: Colors.white, strokeWidth: 3)
+                        )
+                      : const Text(
+                          'Daftar',
+                          style: TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.white,
+                          ),
+                        ),
+                  ),
+                ),
+                
+                const SizedBox(height: 30),
+
+                // Login Link
+                Center(
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Text(
+                        'Sudah memiliki akun? ',
+                        style: TextStyle(color: navyDark.withOpacity(0.7), fontSize: 14),
+                      ),
+                      GestureDetector(
+                        onTap: () {
+                          Navigator.pushReplacement(
+                            context,
+                            MaterialPageRoute(builder: (context) => const LoginScreen()),
+                          );
+                        },
+                        child: Text(
+                          'Login',
+                          style: TextStyle(
+                            color: navyDark, 
+                            fontSize: 14, 
+                            fontWeight: FontWeight.bold,
+                            decoration: TextDecoration.underline,
+                          ),
                         ),
                       ),
+                    ],
+                  ),
                 ),
-              ),
-              
-              const SizedBox(height: 30),
-
-              // Teks Tambahan: Sudah Punya Akun -> Login
-              Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Text(
-                    'Sudah memiliki akun? ',
-                    style: TextStyle(color: textColor, fontSize: 14),
-                  ),
-                  GestureDetector(
-                    onTap: () {
-                      Navigator.pushReplacement(
-                        context,
-                        MaterialPageRoute(builder: (context) => const LoginScreen()),
-                      );
-                    },
-                    child: Text(
-                      'Login',
-                      style: TextStyle(
-                        color: btnColor, 
-                        fontSize: 14, 
-                        fontWeight: FontWeight.bold,
-                        decoration: TextDecoration.underline,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ],
+              ],
+            ),
           ),
         ),
       ),
     );
   }
 
-  // --- WIDGET BANTUAN --- 
   Widget _buildLabel(String text) {
     return Padding(
       padding: const EdgeInsets.only(bottom: 8.0, left: 4.0),
       child: Text(
         text,
         style: TextStyle(
-          fontSize: 12,
+          fontSize: 13,
           fontWeight: FontWeight.bold,
-          color: textColor,
+          color: navyDark,
         ),
       ),
     );
   }
 
-  // Widget Bantuan dimodifikasi agar bisa menerima controller dan format angka
   Widget _buildTextField({
     required String hintText, 
     bool isPassword = false, 
@@ -240,26 +234,36 @@ class _RegisterScreenState extends State<RegisterScreen> {
     return Container(
       decoration: BoxDecoration(
         color: fieldColor,
-        borderRadius: BorderRadius.circular(10),
+        borderRadius: BorderRadius.circular(15),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.15),
-            blurRadius: 4,
-            offset: const Offset(0, 3),
+            color: Colors.black.withOpacity(0.05),
+            blurRadius: 8,
+            offset: const Offset(0, 4),
           ),
         ],
       ),
       child: TextField(
-        controller: controller, // Pemasangan controller
-        obscureText: isPassword,
-        keyboardType: isPhone ? TextInputType.number : TextInputType.text, // Munculkan numpad jika HP
-        inputFormatters: isPhone ? [FilteringTextInputFormatter.digitsOnly] : null, // Blokir huruf jika HP
-        style: TextStyle(color: textColor),
+        controller: controller,
+        obscureText: isPassword ? _obscureText : false,
+        keyboardType: isPhone ? TextInputType.number : TextInputType.text,
+        inputFormatters: isPhone ? [FilteringTextInputFormatter.digitsOnly] : null,
+        style: TextStyle(color: navyDark, fontWeight: FontWeight.w500),
         decoration: InputDecoration(
           hintText: hintText,
-          hintStyle: TextStyle(color: textColor.withOpacity(0.6), fontSize: 14),
+          hintStyle: TextStyle(color: navyDark.withOpacity(0.4), fontSize: 14),
           border: InputBorder.none,
-          contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+          contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 18),
+          // --- ICON MATA DISINI ---
+          suffixIcon: isPassword 
+            ? IconButton(
+                icon: Icon(
+                  _obscureText ? Icons.visibility_off : Icons.visibility,
+                  color: navyDark.withOpacity(0.6),
+                ),
+                onPressed: () => setState(() => _obscureText = !_obscureText),
+              )
+            : null,
         ),
       ),
     );

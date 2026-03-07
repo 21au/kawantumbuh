@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:kawantumbuh/screens/splash_screen.dart';
 import 'package:supabase_flutter/supabase_flutter.dart'; //  Tambahkan import ini
-import 'package:kawantumbuh/screens/main_wrapper.dart';
 
 
 void main() async {

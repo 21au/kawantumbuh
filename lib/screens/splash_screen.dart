@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:kawantumbuh/utils/app_colors.dart';
 import 'package:kawantumbuh/screens/login_screen.dart' as login;
 
 class SplashScreen extends StatefulWidget {
@@ -10,14 +9,20 @@ class SplashScreen extends StatefulWidget {
 }
 
 class _SplashScreenState extends State<SplashScreen> {
+  // --- PALET WARNA UTAMA BUNDA ---
+  final Color navyDark = const Color(0xFF102C57);
+  final Color softPink = const Color(0xFFFFEAEA);
+  final Color highlightPink = const Color(0xFFEBA9A9);
+
   double _opacity = 0.0;
-  double _scale = 0.8;
+  double _scale = 0.5; 
 
   @override
   void initState() {
     super.initState();
+    
     // Memulai animasi setelah delay kecil
-    Future.delayed(const Duration(milliseconds: 500), () {
+    Future.delayed(const Duration(milliseconds: 300), () {
       if (mounted) {
         setState(() {
           _opacity = 1.0;
@@ -29,9 +34,16 @@ class _SplashScreenState extends State<SplashScreen> {
     // Pindah ke halaman Login setelah 3 detik
     Future.delayed(const Duration(seconds: 3), () {
       if (mounted) {
+        // Transisi fade yang mulus
         Navigator.pushReplacement(
           context,
-          MaterialPageRoute(builder: (context) => const login.LoginScreen()),
+          PageRouteBuilder(
+            transitionDuration: const Duration(milliseconds: 800), 
+            pageBuilder: (_, __, ___) => const login.LoginScreen(),
+            transitionsBuilder: (_, animation, __, child) {
+              return FadeTransition(opacity: animation, child: child);
+            },
+          ),
         );
       }
     });
@@ -40,7 +52,8 @@ class _SplashScreenState extends State<SplashScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: AppColors.navyDark, // Background gelap biar mewah
+      // 👇 BACKGROUND DIUBAH JADI TERANG (SOFT PINK)
+      backgroundColor: softPink, 
       body: Center(
         child: AnimatedScale(
           scale: _scale,
@@ -52,31 +65,32 @@ class _SplashScreenState extends State<SplashScreen> {
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                // 👇 INI BAGIAN YANG DIUBAH: Menggunakan gambar logo
+                // Gambar logo
                 Image.asset(
-                  'assets/images/logo.png', // Pastikan nama file sesuai dengan yang kamu simpan
-                  width: 210, // Ukuran logo bisa kamu ubah (misal: 100 atau 150)
+                  'assets/images/logo.png', 
+                  width: 210, 
                   height: 210,
-                  fit: BoxFit.contain, // Memastikan gambar tidak terpotong
+                  fit: BoxFit.contain,
                 ),
-                // 👆 BATAS UBAHAN
                 
                 const SizedBox(height: 20),
-                const Text(
+                Text(
                   "KawanTumbuh",
                   style: TextStyle(
                     fontSize: 38,
                     fontWeight: FontWeight.bold,
-                    color: AppColors.lightPink,
+                    // 👇 TEKS DIUBAH JADI GELAP (NAVY DARK)
+                    color: navyDark, 
                     letterSpacing: 1.5,
                   ),
                 ),
                 const SizedBox(height: 8),
-                const Text(
+                Text(
                   "Tumbuh Bersama, Lebih Bermakna",
                   style: TextStyle(
                     fontSize: 17,
-                    color: AppColors.softPink,
+                    // 👇 TEKS SUBTITLE JUGA NAVY DARK (Diberi sedikit opacity biar lebih estetik)
+                    color: navyDark.withOpacity(0.8), 
                     fontStyle: FontStyle.italic,
                   ),
                 ),

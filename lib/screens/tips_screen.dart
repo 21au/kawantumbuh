@@ -6,6 +6,12 @@ class TipsScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // --- PALET WARNA UTAMA (Disamakan dengan AnakScreen) ---
+    final Color navyDark = const Color(0xFF102C57);
+    final Color softPink = const Color(0xFFFFEAEA); // Background utama
+    final Color fieldPink = const Color(0xFFF5CBCB); // Pengganti putih untuk kartu
+    final Color highlightPink = const Color(0xFFEBA9A9); // Dusty pink
+
     // Data dummy tetap sama
     final List<Map<String, String>> daftarTips = [
       {
@@ -46,14 +52,13 @@ class TipsScreen extends StatelessWidget {
     ];
 
     return Scaffold(
-      backgroundColor: const Color(0xFFFFC0CB), 
+      backgroundColor: softPink, // Menggunakan background utama
       appBar: AppBar(
-        backgroundColor: const Color(0xFF1A2B4C),
+        backgroundColor: navyDark, // Menggunakan navyDark
         elevation: 0,
-        // LEADING (TOMBOL BACK) SUDAH DIHAPUS
-        automaticallyImplyLeading: false, // Memastikan tombol back bawaan tidak muncul
-        title: const Text("Tips Kesehatan", 
-          style: TextStyle(color: Color.fromARGB(255, 243, 216, 216), fontSize: 20, fontWeight: FontWeight.bold)),
+        automaticallyImplyLeading: false,
+        title: Text("Tips Kesehatan", 
+          style: TextStyle(color: softPink, fontSize: 20, fontWeight: FontWeight.bold)),
         centerTitle: true,
       ),
       body: Column(
@@ -61,19 +66,20 @@ class TipsScreen extends StatelessWidget {
           // SEKSI CARI ARTIKEL
           Container(
             padding: const EdgeInsets.fromLTRB(20, 5, 20, 20),
-            color: const Color(0xFF1A2B4C),
+            color: navyDark, // Background section sama dengan AppBar
             child: Container(
               height: 45,
               padding: const EdgeInsets.symmetric(horizontal: 15),
               decoration: BoxDecoration(
-                color: Color.fromARGB(255, 235, 196, 196),
+                color: softPink, // Kolom pencarian pakai softPink
                 borderRadius: BorderRadius.circular(25),
               ),
-              child: const TextField(
+              child: TextField(
+                style: TextStyle(color: navyDark), // Warna teks saat ngetik
                 decoration: InputDecoration(
                   hintText: "Cari artikel kesehatan...",
-                  hintStyle: TextStyle(color: Colors.grey, fontSize: 18),
-                  icon: Icon(Icons.search, color: Color(0xFFF69C91)),
+                  hintStyle: TextStyle(color: navyDark.withOpacity(0.5), fontSize: 16),
+                  icon: Icon(Icons.search, color: navyDark.withOpacity(0.7)),
                   border: InputBorder.none,
                 ),
               ),
@@ -89,8 +95,10 @@ class TipsScreen extends StatelessWidget {
               itemBuilder: (context, index) {
                 final item = daftarTips[index];
                 return Card(
+                  color: fieldPink, // Kartu menggunakan fieldPink (pengganti putih)
                   margin: const EdgeInsets.only(bottom: 12),
                   elevation: 2,
+                  shadowColor: navyDark.withOpacity(0.2),
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
                   child: ListTile(
                     contentPadding: const EdgeInsets.all(12),
@@ -103,27 +111,27 @@ class TipsScreen extends StatelessWidget {
                         fit: BoxFit.cover,
                         cacheWidth: 120, 
                         errorBuilder: (context, error, stackTrace) => Container(
-                          width: 60, height: 60, color: Colors.grey[200],
-                          child: const Icon(Icons.image),
+                          width: 60, height: 60, color: highlightPink,
+                          child: Icon(Icons.image, color: softPink),
                         ),
                       ),
                     ),
                     title: Text(
                       item['title']!, 
-                      style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14)
+                      style: TextStyle(color: navyDark, fontWeight: FontWeight.bold, fontSize: 14)
                     ),
                     subtitle: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         const SizedBox(height: 4),
                         Text(item['desc']!, maxLines: 1, overflow: TextOverflow.ellipsis, 
-                          style: const TextStyle(fontSize: 12)),
+                          style: TextStyle(color: navyDark.withOpacity(0.7), fontSize: 12)),
                         const SizedBox(height: 4),
                         Text(item['category']!, 
-                          style: const TextStyle(color: Color(0xFFF69C91), fontSize: 10, fontWeight: FontWeight.bold)),
+                          style: TextStyle(color: navyDark, fontSize: 10, fontWeight: FontWeight.bold)),
                       ],
                     ),
-                    trailing: const Icon(Icons.arrow_forward_ios, size: 12, color: Colors.grey),
+                    trailing: Icon(Icons.arrow_forward_ios, size: 12, color: navyDark.withOpacity(0.5)),
                     onTap: () {
                       Navigator.push(
                         context,

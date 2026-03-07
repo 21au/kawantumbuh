@@ -14,79 +14,79 @@ class MainWrapper extends StatefulWidget {
 class _MainWrapperState extends State<MainWrapper> {
   int _currentIndex = 0;
 
-  // Daftar halaman yang akan ditampilkan
-  final List<Widget> _pages = [
-    const DashboardScreen(),
-    const AnakScreen(),
-    const TipsScreen(),
-    const ProfileScreen(),
-  ];
+  // --- PALET WARNA UTAMA BUNDA ---
+  final Color navyDark = const Color(0xFF102C57);
+  final Color softPink = const Color(0xFFFFEAEA);
+  final Color highlightPink = const Color(0xFFEBA9A9);
 
-  final Color navyBackground = const Color(0xFF1A2B4C);
-  final Color highlightText = const Color(0xFFF69C91);
-  final Color fabColor = const Color.fromARGB(255, 255, 203, 203);
+  // Fungsi untuk berpindah tab yang bisa dipanggil dari child widget
+  void _navigateToTab(int index) {
+    setState(() {
+      _currentIndex = index;
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
+    // Daftar halaman diletakkan di dalam build agar bisa mengirimkan fungsi _navigateToTab
+    final List<Widget> pages = [
+      DashboardScreen(
+        onNavigateToTips: () => _navigateToTab(2), // Index 2 adalah TipsScreen
+      ),
+      const AnakScreen(),
+      const TipsScreen(),
+      const ProfileScreen(),
+    ];
+
     return Scaffold(
-      // extendBody: true membuat body aplikasi memanjang ke bawah Navbar.
-      // Ini kunci untuk menghilangkan background putih di belakang notch.
-      extendBody: true,
-      
+      extendBody: true, 
       body: IndexedStack(
         index: _currentIndex,
-        children: _pages,
+        children: pages,
       ),
 
-      // Tombol Chat melayang
+      // --- TOMBOL CHAT MELAYANG (FAB) ---
       floatingActionButton: FloatingActionButton(
         onPressed: () {
           // Aksi Chat Konsultasi
         },
-        backgroundColor: fabColor,
+        backgroundColor: highlightPink,
         shape: const CircleBorder(),
         elevation: 4,
-        child: Icon(Icons.chat_bubble_outline, color: navyBackground, size: 28),
+        child: Icon(Icons.chat_bubble_rounded, color: navyDark, size: 28),
       ),
-      
-      // Mengatur posisi FAB tepat di tengah lekukan Navbar
       floatingActionButtonLocation: FloatingActionButtonLocation.centerDocked,
 
       bottomNavigationBar: _buildBottomNav(),
     );
   }
 
+  // --- BOTTOM NAVIGATION BAR ---
   Widget _buildBottomNav() {
     return BottomAppBar(
-      color: navyBackground,
-      // clipBehavior: Clip.antiAlias menghaluskan potongan lekukan
+      color: navyDark,
       clipBehavior: Clip.antiAlias,
       shape: const CircularNotchedRectangle(),
       notchMargin: 8.0,
       elevation: 0,
       child: SizedBox(
-        height: 60,
+        height: 65, 
         child: Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            // Sisi Kiri (Home & Anak)
             Expanded(
               child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                 children: [
                   _buildNavItem(Icons.home_outlined, Icons.home, "Home", 0),
-                  _buildNavItem(Icons.child_care, Icons.child_care, "Anak", 1),
+                  _buildNavItem(Icons.child_care_outlined, Icons.child_care, "Anak", 1),
                 ],
               ),
             ),
             
-            // Memberi ruang kosong tepat di tengah untuk notch FAB
             const SizedBox(width: 48), 
 
-            // Sisi Kanan (Tips & Profil)
             Expanded(
               child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                 children: [
                   _buildNavItem(Icons.lightbulb_outline, Icons.lightbulb, "Tips", 2),
                   _buildNavItem(Icons.person_outline, Icons.person, "Profil", 3),
@@ -102,38 +102,42 @@ class _MainWrapperState extends State<MainWrapper> {
   Widget _buildNavItem(IconData inactiveIcon, IconData activeIcon, String label, int index) {
     bool isActive = _currentIndex == index;
 
-    return GestureDetector(
-      onTap: () {
-        setState(() {
-          _currentIndex = index;
-        });
-      },
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 300),
-        padding: const EdgeInsets.symmetric(horizontal: 8),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            AnimatedScale(
-              scale: isActive ? 1.2 : 1.0,
-              duration: const Duration(milliseconds: 300),
-              child: Icon(
-                isActive ? activeIcon : inactiveIcon,
-                color: isActive ? highlightText : Colors.white54,
-                size: 26,
+    return Expanded(
+      child: GestureDetector(
+        behavior: HitTestBehavior.opaque, 
+        onTap: () => _navigateToTab(index), // Menggunakan fungsi helper
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 300),
+          curve: Curves.easeOutBack, 
+          transform: Matrix4.translationValues(0, isActive ? -6 : 0, 0),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              AnimatedSwitcher(
+                duration: const Duration(milliseconds: 300),
+                transitionBuilder: (child, animation) {
+                  return ScaleTransition(scale: animation, child: child);
+                },
+                child: Icon(
+                  isActive ? activeIcon : inactiveIcon,
+                  key: ValueKey<bool>(isActive), 
+                  color: isActive ? highlightPink : softPink, 
+                  size: isActive ? 28 : 24, 
+                ),
               ),
-            ),
-            const SizedBox(height: 4),
-            AnimatedDefaultTextStyle(
-              duration: const Duration(milliseconds: 300),
-              style: TextStyle(
-                color: isActive ? highlightText : Colors.white54,
-                fontSize: 10,
-                fontWeight: isActive ? FontWeight.bold : FontWeight.normal,
+              const SizedBox(height: 4),
+              AnimatedDefaultTextStyle(
+                duration: const Duration(milliseconds: 300),
+                style: TextStyle(
+                  color: isActive ? highlightPink : softPink, 
+                  fontSize: isActive ? 11 : 10, 
+                  fontWeight: isActive ? FontWeight.bold : FontWeight.normal,
+                ),
+                child: Text(label),
               ),
-              child: Text(label),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );

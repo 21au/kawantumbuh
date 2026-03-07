@@ -1,100 +1,114 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart'; // Untuk FilteringTextInputFormatter (Hanya Angka)
-import 'package:kawantumbuh/utils/app_colors.dart';
+import 'package:flutter/services.dart';
 
 class ForgotPasswordScreen extends StatelessWidget {
   const ForgotPasswordScreen({super.key});
 
+  // --- DEFINISI WARNA (Sama dengan Login & Register) ---
+  final Color bgColor = const Color(0xFFFFEAEA);
+  final Color navyDark = const Color(0xFF102C57);
+  final Color fieldColor = const Color(0xFFF5CBCB);
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: AppColors.lightPink,
+      backgroundColor: bgColor,
       appBar: AppBar(
         backgroundColor: Colors.transparent,
         elevation: 0,
-        // Tombol kembali (Back) di pojok kiri atas
+        // Tombol kembali yang warnanya sudah disesuaikan
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: AppColors.navyDark),
+          icon: Icon(Icons.arrow_back_ios_new, color: navyDark, size: 20),
           onPressed: () => Navigator.pop(context), 
         ),
       ),
       body: SafeArea(
         child: SingleChildScrollView(
-          padding: const EdgeInsets.symmetric(horizontal: 30),
+          padding: const EdgeInsets.symmetric(horizontal: 35),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               const SizedBox(height: 10),
-              // Judul
-              const Text(
+              // Judul Utama
+              Text(
                 "Lupa Password?",
                 style: TextStyle(
-                  fontSize: 35,
+                  fontSize: 32,
                   fontWeight: FontWeight.bold,
-                  color: AppColors.navyDark,
+                  color: navyDark,
+                  letterSpacing: -0.5,
                 ),
               ),
-              const SizedBox(height: 17),
-              // Sub-judul
-              const Text(
+              const SizedBox(height: 15),
+              // Pesan untuk Bunda
+              Text(
                 "Jangan khawatir, Bun. Masukkan nomor WhatsApp yang terdaftar untuk mengatur ulang sandi.",
                 style: TextStyle(
-                  fontSize: 14,
-                  color: AppColors.navyDark,
-                  height: 1.4,
+                  fontSize: 15,
+                  color: navyDark.withOpacity(0.7),
+                  height: 1.5,
                 ),
               ),
-              const SizedBox(height: 40),
+              const SizedBox(height: 45),
 
               // Label Input
-              const Padding(
-                padding: EdgeInsets.only(bottom: 8.0, left: 4.0),
+              Padding(
+                padding: const EdgeInsets.only(bottom: 8.0, left: 4.0),
                 child: Text(
                   "No HP/Whatsapp",
                   style: TextStyle(
-                    fontSize: 12,
+                    fontSize: 14,
                     fontWeight: FontWeight.bold,
-                    color: AppColors.navyDark,
+                    color: navyDark,
                   ),
                 ),
               ),
               
-              // Kolom Input (Hanya Angka)
+              // Kolom Input (Desain sama dengan Login)
               Container(
                 decoration: BoxDecoration(
-                  color: const Color(0xFFEAA6A9), // Sesuaikan warna field
-                  borderRadius: BorderRadius.circular(10),
+                  color: fieldColor,
+                  borderRadius: BorderRadius.circular(15),
                   boxShadow: [
-                    BoxShadow(color: Colors.black.withOpacity(0.15), blurRadius: 4, offset: const Offset(0, 3)),
+                    BoxShadow(
+                      color: Colors.black.withOpacity(0.05),
+                      blurRadius: 8,
+                      offset: const Offset(0, 4),
+                    ),
                   ],
                 ),
                 child: TextField(
-                  keyboardType: TextInputType.number, // Membuka keyboard angka
+                  keyboardType: TextInputType.number,
                   inputFormatters: [
-                    FilteringTextInputFormatter.digitsOnly, // Mencegah huruf
+                    FilteringTextInputFormatter.digitsOnly,
                   ],
-                  style: const TextStyle(color: AppColors.navyDark),
+                  style: TextStyle(color: navyDark, fontWeight: FontWeight.w500),
                   decoration: InputDecoration(
                     hintText: "081234567890",
-                    hintStyle: TextStyle(color: AppColors.navyDark.withOpacity(0.6), fontSize: 14),
+                    hintStyle: TextStyle(
+                      color: navyDark.withOpacity(0.4), 
+                      fontSize: 14
+                    ),
                     border: InputBorder.none,
-                    contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                    contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 18),
                   ),
                 ),
               ),
               
-              const SizedBox(height: 30),
+              const SizedBox(height: 40),
 
-              // Tombol Kirim
+              // Tombol Kirim yang mantap
               SizedBox(
                 width: double.infinity,
+                height: 55,
                 child: ElevatedButton(
                   onPressed: () {
-                    // Nanti kita atur fungsi kirim OTP-nya di sini
+                    // Logika OTP atau reset password nanti di sini
                   },
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: AppColors.oceanBlue,
-                    padding: const EdgeInsets.symmetric(vertical: 18),
+                    backgroundColor: navyDark,
+                    elevation: 4,
+                    shadowColor: navyDark.withOpacity(0.4),
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(15),
                     ),

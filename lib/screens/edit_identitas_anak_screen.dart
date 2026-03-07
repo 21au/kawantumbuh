@@ -9,17 +9,15 @@ class EditDataAnakScreen extends StatefulWidget {
 }
 
 class _EditDataAnakScreenState extends State<EditDataAnakScreen> {
-  // --- WARNA ---
-  final Color navyBackground = const Color(0xFF1A2B4C);
-  final Color oceanBlue = const Color(0xFF1E88B3);
-  final Color offWhitePink = const Color(0xFFFFF0F1); 
-  final Color lightPinkBg = const Color(0xFFFFC0CB); 
-  final Color borderPink = const Color(0xFFF8BBD0);
-  final Color iconBgPink = const Color(0xFFF4C2C2);
+  // --- PALET WARNA BARU SESUAI TEMA BUNDA ---
+  final Color navyDark = const Color(0xFF102C57);
+  final Color softPink = const Color(0xFFFFEAEA); 
+  final Color highlightPink = const Color(0xFFD6B5B5); // Dusty pink untuk aksen
+  final Color whiteCard = Colors.white; // Biar formnya bersih dan menonjol
 
   // --- STATE ---
   String selectedGender = 'Perempuan';
-  String? selectedGolDarah; // Bisa null/kosong
+  String? selectedGolDarah; 
   final TextEditingController _dateController = TextEditingController();
   
   final List<String> golDarahList = ['A', 'B', 'AB', 'O', 'Belum Tahu'];
@@ -35,9 +33,9 @@ class _EditDataAnakScreenState extends State<EditDataAnakScreen> {
         return Theme(
           data: Theme.of(context).copyWith(
             colorScheme: ColorScheme.light(
-              primary: navyBackground, 
-              onPrimary: offWhitePink,
-              onSurface: navyBackground,
+              primary: navyDark, // Warna header kalender
+              onPrimary: Colors.white, // Warna teks di header
+              onSurface: navyDark, // Warna teks tanggal
             ),
           ),
           child: child!,
@@ -54,7 +52,7 @@ class _EditDataAnakScreenState extends State<EditDataAnakScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: lightPinkBg,
+      backgroundColor: softPink, // Background utama soft pink
       body: Column(
         children: [
           // --- HEADER ANTI OVERFLOW ---
@@ -65,7 +63,7 @@ class _EditDataAnakScreenState extends State<EditDataAnakScreen> {
               left: 20, right: 20, bottom: 25
             ),
             decoration: BoxDecoration(
-              color: navyBackground,
+              color: navyDark,
               borderRadius: const BorderRadius.only(
                 bottomLeft: Radius.circular(30),
                 bottomRight: Radius.circular(30),
@@ -78,15 +76,15 @@ class _EditDataAnakScreenState extends State<EditDataAnakScreen> {
                   onTap: () => Navigator.pop(context),
                   child: Row(
                     children: [
-                      Icon(Icons.arrow_back, color: offWhitePink, size: 20),
+                      const Icon(Icons.arrow_back, color: Colors.white, size: 20),
                       const SizedBox(width: 5),
-                      Text("Kembali", style: TextStyle(color: offWhitePink, fontSize: 14)),
+                      const Text("Kembali", style: TextStyle(color: Colors.white, fontSize: 14)),
                     ],
                   ),
                 ),
                 const SizedBox(height: 15),
-                Text("Data Anak", style: TextStyle(color: offWhitePink, fontSize: 24, fontWeight: FontWeight.bold)),
-                Text("Lengkapi identitas si kecil", style: TextStyle(color: offWhitePink.withOpacity(0.8), fontSize: 13)),
+                const Text("Data Anak", style: TextStyle(color: Colors.white, fontSize: 24, fontWeight: FontWeight.bold)),
+                Text("Lengkapi identitas si kecil", style: TextStyle(color: Colors.white.withOpacity(0.8), fontSize: 13)),
               ],
             ),
           ),
@@ -97,6 +95,7 @@ class _EditDataAnakScreenState extends State<EditDataAnakScreen> {
               padding: const EdgeInsets.all(20),
               child: Column(
                 children: [
+                  // CARD 1: IDENTITAS ANAK
                   _buildSectionCard(
                     icon: Icons.child_care,
                     title: "Identitas Anak",
@@ -129,6 +128,7 @@ class _EditDataAnakScreenState extends State<EditDataAnakScreen> {
                   ),
                   const SizedBox(height: 15),
 
+                  // CARD 2: DATA ORANG TUA
                   _buildSectionCard(
                     icon: Icons.favorite_border,
                     title: "Data Orang Tua",
@@ -142,6 +142,7 @@ class _EditDataAnakScreenState extends State<EditDataAnakScreen> {
                   ),
                   const SizedBox(height: 15),
 
+                  // CARD 3: KONTAK
                   _buildSectionCard(
                     icon: Icons.call_outlined,
                     title: "Kontak",
@@ -155,16 +156,19 @@ class _EditDataAnakScreenState extends State<EditDataAnakScreen> {
                   ),
                   const SizedBox(height: 30),
 
+                  // TOMBOL SIMPAN
                   SizedBox(
                     width: double.infinity,
                     height: 55,
                     child: ElevatedButton(
                       onPressed: () => Navigator.pop(context),
                       style: ElevatedButton.styleFrom(
-                        backgroundColor: navyBackground,
+                        backgroundColor: navyDark,
                         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
+                        elevation: 5,
+                        shadowColor: navyDark.withOpacity(0.3),
                       ),
-                      child: Text("Simpan Data", style: TextStyle(color: offWhitePink, fontSize: 16, fontWeight: FontWeight.bold)),
+                      child: const Text("Simpan Data", style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)),
                     ),
                   ),
                   const SizedBox(height: 20),
@@ -183,7 +187,17 @@ class _EditDataAnakScreenState extends State<EditDataAnakScreen> {
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(color: offWhitePink, borderRadius: BorderRadius.circular(20)),
+      decoration: BoxDecoration(
+        color: whiteCard, 
+        borderRadius: BorderRadius.circular(20),
+        boxShadow: [
+          BoxShadow(
+            color: navyDark.withOpacity(0.04),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
+          )
+        ]
+      ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -192,12 +206,12 @@ class _EditDataAnakScreenState extends State<EditDataAnakScreen> {
               if (icon != null) ...[
                 Container(
                   padding: const EdgeInsets.all(8),
-                  decoration: BoxDecoration(color: iconBgPink, shape: BoxShape.circle),
-                  child: Icon(icon, color: navyBackground, size: 20),
+                  decoration: BoxDecoration(color: softPink, shape: BoxShape.circle),
+                  child: Icon(icon, color: navyDark, size: 20),
                 ),
                 const SizedBox(width: 12),
               ],
-              Text(title, style: TextStyle(color: navyBackground, fontSize: 16, fontWeight: FontWeight.bold)),
+              Text(title, style: TextStyle(color: navyDark, fontSize: 16, fontWeight: FontWeight.bold)),
             ],
           ),
           const SizedBox(height: 20),
@@ -213,7 +227,7 @@ class _EditDataAnakScreenState extends State<EditDataAnakScreen> {
       child: RichText(
         text: TextSpan(
           text: text,
-          style: TextStyle(color: navyBackground, fontSize: 13, fontWeight: FontWeight.bold),
+          style: TextStyle(color: navyDark, fontSize: 13, fontWeight: FontWeight.bold),
           children: [if (isRequired) const TextSpan(text: " *", style: TextStyle(color: Colors.redAccent))],
         ),
       ),
@@ -227,35 +241,38 @@ class _EditDataAnakScreenState extends State<EditDataAnakScreen> {
       readOnly: readOnly,
       maxLines: maxLines,
       keyboardType: keyboardType,
-      style: TextStyle(color: navyBackground, fontSize: 14),
+      style: TextStyle(color: navyDark, fontSize: 14),
       decoration: InputDecoration(
         hintText: hint,
-        prefixIcon: icon != null ? Icon(icon, color: Colors.grey, size: 20) : null,
+        hintStyle: TextStyle(color: navyDark.withOpacity(0.4)),
+        prefixIcon: icon != null ? Icon(icon, color: navyDark.withOpacity(0.5), size: 20) : null,
         filled: true,
-        fillColor: offWhitePink,
-        enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide(color: borderPink)),
-        focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide(color: oceanBlue)),
+        fillColor: Colors.white,
+        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+        enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide(color: highlightPink.withOpacity(0.5))),
+        focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide(color: navyDark, width: 1.5)),
       ),
     );
   }
 
   Widget _buildDropdownGolDarah() {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 15),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 2),
       decoration: BoxDecoration(
-        color: offWhitePink,
+        color: Colors.white,
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: borderPink),
+        border: Border.all(color: highlightPink.withOpacity(0.5)),
       ),
       child: DropdownButtonHideUnderline(
         child: DropdownButton<String>(
           value: selectedGolDarah,
-          hint: const Text("Pilih Golongan Darah", style: TextStyle(fontSize: 14)),
+          hint: Text("Pilih Golongan Darah", style: TextStyle(fontSize: 14, color: navyDark.withOpacity(0.4))),
           isExpanded: true,
+          icon: Icon(Icons.arrow_drop_down, color: navyDark),
           items: golDarahList.map((String value) {
             return DropdownMenuItem<String>(
               value: value,
-              child: Text(value, style: TextStyle(color: navyBackground)),
+              child: Text(value, style: TextStyle(color: navyDark)),
             );
           }).toList(),
           onChanged: (newValue) {
@@ -282,14 +299,24 @@ class _EditDataAnakScreenState extends State<EditDataAnakScreen> {
     bool isSelected = selectedGender == gender;
     return GestureDetector(
       onTap: () => setState(() => selectedGender = gender),
-      child: Container(
-        padding: const EdgeInsets.symmetric(vertical: 12),
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 200),
+        padding: const EdgeInsets.symmetric(vertical: 14),
         decoration: BoxDecoration(
-          color: isSelected ? iconBgPink : offWhitePink,
+          color: isSelected ? highlightPink : Colors.white,
           borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: isSelected ? oceanBlue : borderPink),
+          border: Border.all(color: isSelected ? navyDark : highlightPink.withOpacity(0.5), width: isSelected ? 1.5 : 1),
         ),
-        child: Center(child: Text("$emoji $gender", style: TextStyle(color: navyBackground, fontWeight: isSelected ? FontWeight.bold : FontWeight.normal))),
+        child: Center(
+          child: Text(
+            "$emoji $gender", 
+            style: TextStyle(
+              color: navyDark, 
+              fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+              fontSize: 14,
+            )
+          )
+        ),
       ),
     );
   }

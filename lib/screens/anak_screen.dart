@@ -1,26 +1,8 @@
 import 'package:flutter/material.dart';
-import 'package:kawantumbuh/utils/app_colors.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import 'edit_identitas_anak_screen.dart';
 import 'catat_pertumbuhan_screen.dart';
-
-// --- 1. MODEL DATA ---
-class ChildData {
-  final String name;
-  final String birthDate;
-  final String age;
-  final String weight;
-  final String height;
-  final String gender;
-
-  ChildData({
-    required this.name,
-    required this.birthDate,
-    required this.age,
-    required this.weight,
-    required this.height,
-    required this.gender,
-  });
-}
+import 'daftar_anak_screen.dart';
 
 class AnakScreen extends StatefulWidget {
   const AnakScreen({super.key});
@@ -30,115 +12,148 @@ class AnakScreen extends StatefulWidget {
 }
 
 class _AnakScreenState extends State<AnakScreen> {
-  final Color navyBackground = const Color(0xFF1A2B4C);
-  final Color oceanBlue = const Color(0xFF1E88B3);
-  final Color softPinkCard = const Color(0xFFB88E9B);
-  final Color offWhitePink = const Color(0xFFFCE8E9);
+  // --- PALET WARNA UTAMA (100% TANPA WARNA PUTIH) ---
+  final Color navyDark = const Color(0xFF102C57);
+  final Color softPink = const Color(0xFFFFEAEA); // Background utama
+  final Color fieldPink = const Color(0xFFF5CBCB); // Pengganti putih untuk kartu
+  final Color highlightPink = const Color(0xFFEBA9A9); // Dusty pink
+  final Color successGreen = const Color(0xFFA5D6A7); // Hijau untuk status
+  final Color brightPink = Colors.pinkAccent;
 
   bool isBeratBadan = true;
   int selectedIndex = 0;
+  bool _isLoading = true;
+  List<Map<String, dynamic>> _daftarAnak = [];
+  List<Map<String, dynamic>> _riwayatPertumbuhan = [];
 
-  final List<ChildData> daftarAnak = [
-    ChildData(name: "Fatimah Azzahra", birthDate: "21 Juli 2022", age: "18 Bulan", weight: "10.4 Kg", height: "80 cm", gender: "Perempuan"),
-    ChildData(name: "Ahmad Faiz", birthDate: "10 Jan 2024", age: "4 Bulan", weight: "6.2 Kg", height: "65 cm", gender: "Laki-laki"),
-  ];
+  @override
+  void initState() {
+    super.initState();
+    _fetchDataAnak();
+  }
+
+  // --- LOGIKA AMBIL DATA ---
+  Future<void> _fetchDataAnak() async {
+    if (!mounted) return;
+    setState(() => _isLoading = true);
+    try {
+      final user = Supabase.instance.client.auth.currentUser;
+      if (user == null) return;
+
+      final dataAnak = await Supabase.instance.client
+          .from('anak')
+          .select()
+          .eq('user_id', user.id);
+
+      if (mounted) {
+        setState(() {
+          _daftarAnak = List<Map<String, dynamic>>.from(dataAnak);
+          _isLoading = false;
+        });
+
+        if (_daftarAnak.isNotEmpty) {
+          _fetchRiwayat(selectedIndex);
+        }
+      }
+    } catch (e) {
+      debugPrint("Error fetch anak: $e");
+      if (mounted) setState(() => _isLoading = false);
+    }
+  }
+
+  Future<void> _fetchRiwayat(int index) async {
+    try {
+      final childId = _daftarAnak[index]['id'];
+
+      final dataRiwayat = await Supabase.instance.client
+          .from('growth_records')
+          .select()
+          .eq('child_id', childId)
+          .order('date', ascending: false);
+
+      if (mounted) {
+        setState(() {
+          _riwayatPertumbuhan = List<Map<String, dynamic>>.from(dataRiwayat);
+        });
+      }
+    } catch (e) {
+      debugPrint("Error fetch riwayat: $e");
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
-    if (daftarAnak.isEmpty) {
-      return _buildEmptyState();
+    if (_isLoading) {
+      return Scaffold(
+        backgroundColor: softPink,
+        body: Center(child: CircularProgressIndicator(color: navyDark)),
+      );
     }
 
-    final currentChild = daftarAnak[selectedIndex];
+    if (_daftarAnak.isEmpty) {
+      return Scaffold(backgroundColor: softPink, body: _buildEmptyState());
+    }
+
+    final currentChild = _daftarAnak[selectedIndex];
 
     return Scaffold(
-      backgroundColor: AppColors.lightPink,
-      body: SingleChildScrollView(
-        child: Column(
-          children: [
-            _buildHeader(currentChild),
-            const SizedBox(height: 20),
-            
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 20),
-              child: Row(
-                children: [
-                  Expanded(child: _buildToggleButton("Berat Badan", isBeratBadan)),
-                  const SizedBox(width: 15),
-                  Expanded(child: _buildToggleButton("Tinggi Badan", !isBeratBadan)),
-                ],
+      backgroundColor: softPink,
+      body: RefreshIndicator(
+        onRefresh: _fetchDataAnak,
+        color: navyDark,
+        backgroundColor: softPink,
+        child: SingleChildScrollView(
+          physics: const AlwaysScrollableScrollPhysics(),
+          child: Column(
+            children: [
+              _buildHeader(currentChild),
+              const SizedBox(height: 25),
+              _buildToggleSection(),
+              const SizedBox(height: 25),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 20),
+                child: Column(
+                  children: [
+                    _buildFauxChartCard(),
+                    const SizedBox(height: 20),
+                    _buildStatusPertumbuhan(currentChild['nama'] ?? "Si Kecil"),
+                    const SizedBox(height: 20),
+                    _buildPrediksiGizi(currentChild),
+                    const SizedBox(height: 30),
+                    _buildRiwayatHeader(context),
+                    const SizedBox(height: 15),
+                    _buildRiwayatList(),
+                    const SizedBox(height: 120), // Spasi untuk Bottom Nav
+                  ],
+                ),
               ),
-            ),
-            const SizedBox(height: 25),
-
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 20),
-              child: Column(
-                children: [
-                  _buildFauxChartCard(),
-                  const SizedBox(height: 15),
-                  _buildStatusPertumbuhan(currentChild.name),
-                  const SizedBox(height: 15),
-                  _buildPrediksiGizi(currentChild),
-                  const SizedBox(height: 30),
-                  _buildRiwayatHeader(context),
-                  const SizedBox(height: 15),
-                  _buildRiwayatList(),
-                  
-                  // 👇 INI PERBAIKANNYA: Ganjalan agar tidak ketutup Navbar
-                  const SizedBox(height: 120), 
-                ],
-              ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );
   }
 
-  Widget _buildEmptyState() {
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(30.0),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(Icons.child_friendly_rounded, size: 100, color: navyBackground.withOpacity(0.5)),
-            const SizedBox(height: 20),
-            Text("Belum Ada Data Anak", style: TextStyle(color: navyBackground, fontSize: 20, fontWeight: FontWeight.bold)),
-            const SizedBox(height: 10),
-            const Text("Yuk, tambahkan data si kecil untuk mulai memantau tumbuh kembangnya.", textAlign: TextAlign.center),
-            const SizedBox(height: 30),
-            ElevatedButton(
-              onPressed: () {},
-              style: ElevatedButton.styleFrom(backgroundColor: oceanBlue, padding: const EdgeInsets.symmetric(horizontal: 40, vertical: 15)),
-              child: const Text("Tambah Data Anak", style: TextStyle(color: Colors.white)),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
+  // --- WIDGET HELPERS ---
 
-  Widget _buildHeader(ChildData child) {
+  Widget _buildHeader(Map<String, dynamic> child) {
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.only(top: 60, left: 20, right: 20, bottom: 25),
       decoration: BoxDecoration(
-        color: navyBackground,
-        borderRadius: const BorderRadius.only(bottomLeft: Radius.circular(30), bottomRight: Radius.circular(30)),
+        color: navyDark,
+        borderRadius: const BorderRadius.only(
+            bottomLeft: Radius.circular(30), bottomRight: Radius.circular(30)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text("Kesehatan Anak", style: TextStyle(color: offWhitePink, fontSize: 24, fontWeight: FontWeight.bold)),
-              const Text("Pantau tumbuh kembang si kecil secara berkala", style: TextStyle(color: Colors.white70, fontSize: 13)),
-            ],
-          ),
-          if (daftarAnak.length > 1) ...[
+          Text("Kesehatan Anak",
+              style: TextStyle(
+                  color: softPink, fontSize: 26, fontWeight: FontWeight.bold)),
+          Text("Pantau tumbuh kembang si kecil",
+              style: TextStyle(color: softPink.withOpacity(0.8), fontSize: 14)),
+          if (_daftarAnak.length > 1) ...[
             const SizedBox(height: 20),
             _buildChildSelector(),
           ],
@@ -154,27 +169,28 @@ class _AnakScreenState extends State<AnakScreen> {
       height: 40,
       child: ListView.builder(
         scrollDirection: Axis.horizontal,
-        itemCount: daftarAnak.length,
+        itemCount: _daftarAnak.length,
         itemBuilder: (context, index) {
           bool isSelected = selectedIndex == index;
           return GestureDetector(
-            onTap: () => setState(() => selectedIndex = index),
+            onTap: () {
+              setState(() => selectedIndex = index);
+              _fetchRiwayat(index);
+            },
             child: AnimatedContainer(
               duration: const Duration(milliseconds: 300),
               margin: const EdgeInsets.only(right: 10),
               padding: const EdgeInsets.symmetric(horizontal: 20),
               decoration: BoxDecoration(
-                color: isSelected ? oceanBlue : Colors.white.withOpacity(0.1),
+                color: isSelected ? highlightPink : softPink.withOpacity(0.25),
                 borderRadius: BorderRadius.circular(25),
               ),
               alignment: Alignment.center,
-              child: Text(
-                daftarAnak[index].name, 
-                style: TextStyle(
-                  color: isSelected ? Colors.white : Colors.white70, 
-                  fontWeight: isSelected ? FontWeight.bold : FontWeight.normal
-                )
-              ),
+              child: Text(_daftarAnak[index]['nama'] ?? "Anak",
+                  style: TextStyle(
+                      color: isSelected ? navyDark : softPink.withOpacity(0.8),
+                      fontWeight:
+                          isSelected ? FontWeight.bold : FontWeight.normal)),
             ),
           );
         },
@@ -182,114 +198,66 @@ class _AnakScreenState extends State<AnakScreen> {
     );
   }
 
-  Widget _buildMainCard(ChildData child) {
+  Widget _buildMainCard(Map<String, dynamic> child) {
+    final String usiaAnak = child['usia']?.toString() ?? "0";
+
     return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(color: softPinkCard, borderRadius: BorderRadius.circular(20)),
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+          color: softPink.withOpacity(0.50), borderRadius: BorderRadius.circular(20)),
       child: Column(
         children: [
           Row(
             children: [
-              Container(padding: const EdgeInsets.all(12), decoration: const BoxDecoration(color: AppColors.lightPink, shape: BoxShape.circle), child: Icon(Icons.child_care, color: navyBackground, size: 30)),
+              Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                      color: highlightPink, shape: BoxShape.circle),
+                  child: Icon(Icons.face_retouching_natural, color: softPink, size: 35)),
               const SizedBox(width: 15),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(child.name, style: TextStyle(color: navyBackground, fontSize: 18, fontWeight: FontWeight.bold)),
-                    Text("${child.gender}, ${child.birthDate}", style: TextStyle(color: navyBackground, fontSize: 13)),
+                    Text(child['nama'] ?? "Tanpa Nama",
+                        style: TextStyle(
+                            color: softPink,
+                            fontSize: 20,
+                            fontWeight: FontWeight.bold)),
+                    const SizedBox(height: 4),
+                    Text("${child['jenis_kelamin'] ?? 'Perempuan'}, 21 Juli 2022",
+                        style: TextStyle(color: softPink.withOpacity(0.7), fontSize: 15)),
                   ],
                 ),
               ),
               GestureDetector(
-                onTap: () => Navigator.push(context, MaterialPageRoute(builder: (context) => const EditDataAnakScreen())),
-                child: Icon(Icons.edit_square, color: navyBackground.withOpacity(0.5)),
+                onTap: () => Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                        builder: (context) => const EditDataAnakScreen())),
+                child: Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: highlightPink,
+                    shape: BoxShape.circle,
+                  ),
+                  child: Icon(Icons.edit, color: softPink, size: 18),
+                ),
               ),
             ],
           ),
           const SizedBox(height: 15),
-          Divider(color: navyBackground.withOpacity(0.2)),
-          const SizedBox(height: 10),
+          Divider(color: softPink.withOpacity(0.2), thickness: 1),
+          const SizedBox(height: 15),
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              _buildProfileStat("Usia", child.age),
-              _buildProfileStat("Berat", child.weight),
-              _buildProfileStat("Tinggi", child.height),
+              _buildProfileStat("Usia", "$usiaAnak Bulan"),
+              _buildProfileStat("Berat",
+                  _riwayatPertumbuhan.isNotEmpty ? "${_riwayatPertumbuhan[0]['weight']} Kg" : "--"),
+              _buildProfileStat("Tinggi",
+                  _riwayatPertumbuhan.isNotEmpty ? "${_riwayatPertumbuhan[0]['height']} cm" : "--"),
             ],
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildPrediksiGizi(ChildData child) {
-    return Container(
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(color: offWhitePink, borderRadius: BorderRadius.circular(20)),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              const Icon(Icons.monitor_heart_outlined, color: Color(0xFFB88E9B), size: 28),
-              const SizedBox(width: 10),
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text("Prediksi Status Gizi", style: TextStyle(color: navyBackground, fontWeight: FontWeight.bold, fontSize: 16)),
-                  const Text("Berdasarkan data terbaru", style: TextStyle(color: Colors.grey, fontSize: 11)),
-                ],
-              ),
-            ],
-          ),
-          const SizedBox(height: 20),
-          Container(
-            padding: const EdgeInsets.all(15),
-            decoration: BoxDecoration(color: const Color(0xFFFFE4E6), borderRadius: BorderRadius.circular(15)),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    _buildProfileStat("Usia Anak", child.age),
-                    _buildProfileStat("BMI (IMT)", "15.6"),
-                    const SizedBox(width: 10),
-                  ],
-                ),
-                const SizedBox(height: 15),
-                const Text("Status Gizi", style: TextStyle(color: Colors.grey, fontSize: 12)),
-                const SizedBox(height: 5),
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 15, vertical: 8),
-                  decoration: BoxDecoration(color: oceanBlue, borderRadius: BorderRadius.circular(10)),
-                  child: const Text("Normal", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(height: 15),
-          Container(
-            padding: const EdgeInsets.all(15),
-            decoration: BoxDecoration(color: oceanBlue.withOpacity(0.1), borderRadius: BorderRadius.circular(15)),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  children: [
-                    Icon(Icons.balance, color: navyBackground, size: 18),
-                    const SizedBox(width: 8),
-                    const Text("Rekomendasi", style: TextStyle(fontWeight: FontWeight.bold)),
-                  ],
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  "Pertumbuhan anak sangat baik! Terus berikan nutrisi seimbang dan pantau perkembangannya secara rutin.",
-                  style: TextStyle(color: navyBackground, fontSize: 12, height: 1.4),
-                ),
-              ],
-            ),
           ),
         ],
       ),
@@ -300,10 +268,27 @@ class _AnakScreenState extends State<AnakScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(label, style: TextStyle(color: navyBackground.withOpacity(0.6), fontSize: 12)),
+        Text(label,
+            style:
+                TextStyle(color: softPink, fontSize: 14)),
         const SizedBox(height: 4),
-        Text(value, style: TextStyle(color: navyBackground, fontSize: 15, fontWeight: FontWeight.bold)),
+        Text(value,
+            style: TextStyle(
+                color: softPink, fontSize: 18, fontWeight: FontWeight.bold)),
       ],
+    );
+  }
+
+  Widget _buildToggleSection() {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 20),
+      child: Row(
+        children: [
+          Expanded(child: _buildToggleButton("Berat Badan", isBeratBadan)),
+          const SizedBox(width: 15),
+          Expanded(child: _buildToggleButton("Tinggi Badan", !isBeratBadan)),
+        ],
+      ),
     );
   }
 
@@ -312,47 +297,188 @@ class _AnakScreenState extends State<AnakScreen> {
       onTap: () => setState(() => isBeratBadan = (title == "Berat Badan")),
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 200),
-        padding: const EdgeInsets.symmetric(vertical: 12),
+        padding: const EdgeInsets.symmetric(vertical: 14),
         decoration: BoxDecoration(
-          color: isActive ? oceanBlue : Colors.white,
-          borderRadius: BorderRadius.circular(15),
-          border: Border.all(color: oceanBlue.withOpacity(0.2))
-        ),
+            color: isActive ? navyDark : Colors.transparent,
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: navyDark, width: 1.5)),
         alignment: Alignment.center,
-        child: Text(title, style: TextStyle(color: isActive ? Colors.white : oceanBlue, fontWeight: FontWeight.bold)),
+        child: Text(title,
+            style: TextStyle(
+                color: isActive ? softPink : navyDark,
+                fontSize: 14,
+                fontWeight: FontWeight.bold)),
       ),
     );
   }
 
+  // --- BAGIAN GRAFIK KIA YANG DIMINTA BUNDA ---
   Widget _buildFauxChartCard() {
     return Container(
-      width: double.infinity, padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(color: offWhitePink, borderRadius: BorderRadius.circular(20)),
+      width: double.infinity,
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+          color: softPink,
+          borderRadius: BorderRadius.circular(20),
+          boxShadow: [
+            BoxShadow(
+              color: navyDark.withOpacity(0.15),
+              blurRadius: 15,
+              offset: const Offset(0, 8),
+            )
+          ]),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(isBeratBadan ? "Grafik Berat Badan" : "Grafik Tinggi Badan", style: TextStyle(color: navyBackground, fontWeight: FontWeight.bold, fontSize: 16)),
-          const SizedBox(height: 20),
-          Container(
-            height: 150,
-            decoration: BoxDecoration(border: Border(left: BorderSide(color: navyBackground.withOpacity(0.2)), bottom: BorderSide(color: navyBackground.withOpacity(0.2)))),
-            child: Center(child: Icon(isBeratBadan ? Icons.show_chart : Icons.bar_chart, color: oceanBlue, size: 80)),
+          Text(isBeratBadan ? "Prediksi Berat Badan" : "Prediksi Tinggi Badan",
+              style: TextStyle(
+                  color: navyDark,
+                  fontWeight: FontWeight.bold,
+                  fontSize: 16)),
+          const SizedBox(height: 8),
+          
+          Text("↑ Sumbu Y: ${isBeratBadan ? 'Nilai Berat (kg)' : 'Nilai Tinggi (cm)'}",
+              style: TextStyle(color: navyDark.withOpacity(0.6), fontSize: 10, fontWeight: FontWeight.w600)),
+          const SizedBox(height: 15),
+          
+          SizedBox(
+            height: 180,
+            child: Row(
+              children: [
+                Column(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    _chartLabel("Max"),
+                    _chartLabel("Mid"),
+                    _chartLabel("Min"),
+                    _chartLabel("0"),
+                  ],
+                ),
+                const SizedBox(width: 10),
+                
+                Expanded(
+                  child: Column(
+                    children: [
+                      Expanded(
+                        child: Container(
+                          decoration: BoxDecoration(
+                            border: Border(
+                              left: BorderSide(color: navyDark.withOpacity(0.3), width: 2),
+                              bottom: BorderSide(color: navyDark.withOpacity(0.3), width: 2),
+                            ),
+                          ),
+                          child: CustomPaint(
+                            size: Size.infinite,
+                            painter: KIAChartPainter(navyDark),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          _chartLabel("t1"),
+                          _chartLabel("t2"),
+                          _chartLabel("t3"),
+                          _chartLabel("t4"),
+                          _chartLabel("t5"),
+                        ],
+                      )
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 10),
+          Center(
+            child: Text("Sumbu X: Periode Waktu →",
+                style: TextStyle(color: navyDark.withOpacity(0.6), fontSize: 10, fontWeight: FontWeight.w600)),
           ),
         ],
       ),
     );
   }
 
+  Widget _chartLabel(String text) {
+    return Text(text, style: TextStyle(color: navyDark.withOpacity(0.6), fontSize: 11, fontWeight: FontWeight.bold));
+  }
+
   Widget _buildStatusPertumbuhan(String name) {
     return Container(
       padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(color: oceanBlue, borderRadius: BorderRadius.circular(20)),
+      decoration: BoxDecoration(
+          color: successGreen,
+          borderRadius: BorderRadius.circular(15)),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(children: [Icon(Icons.check_circle_outline, color: offWhitePink), const SizedBox(width: 10), const Text("Status Pertumbuhan", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16))]),
+          Row(children: [
+            Icon(Icons.check_circle, color: navyDark, size: 22),
+            const SizedBox(width: 10),
+            Text("Status Pertumbuhan",
+                style: TextStyle(
+                    color: navyDark,
+                    fontWeight: FontWeight.bold,
+                    fontSize: 16))
+          ]),
           const SizedBox(height: 10),
-          Text("Pertumbuhan $name normal dan sesuai kurva WHO.", style: const TextStyle(color: Colors.white, fontSize: 13)),
+          Text("Pertumbuhan si kecil normal dan sesuai dengan kurva pertumbuhan WHO. Terus berikan nutrisi seimbang ya bun!",
+              style: TextStyle(color: navyDark.withOpacity(0.9), fontSize: 13, height: 1.4)),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildPrediksiGizi(Map<String, dynamic> child) {
+    return Container(
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+          color: fieldPink,
+          borderRadius: BorderRadius.circular(20)),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(Icons.monitor_heart, color: brightPink, size: 28),
+              const SizedBox(width: 10),
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text("Prediksi Status Gizi",
+                      style: TextStyle(
+                          color: navyDark,
+                          fontWeight: FontWeight.bold,
+                          fontSize: 16)),
+                  Text("Berdasarkan data terbaru",
+                      style: TextStyle(color: navyDark.withOpacity(0.5), fontSize: 11)),
+                ],
+              ),
+            ],
+          ),
+          const SizedBox(height: 20),
+          Container(
+            padding: const EdgeInsets.all(15),
+            decoration: BoxDecoration(
+                color: softPink,
+                borderRadius: BorderRadius.circular(15)),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text("Status Gizi:",
+                    style: TextStyle(fontWeight: FontWeight.bold, color: navyDark)),
+                Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                  decoration: BoxDecoration(
+                      color: navyDark, borderRadius: BorderRadius.circular(10)),
+                  child: Text("Normal",
+                      style: TextStyle(color: softPink, fontSize: 12, fontWeight: FontWeight.bold)),
+                )
+              ],
+            ),
+          ),
         ],
       ),
     );
@@ -362,52 +488,178 @@ class _AnakScreenState extends State<AnakScreen> {
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
-        Text("Riwayat Pengukuran", style: TextStyle(color: navyBackground, fontSize: 18, fontWeight: FontWeight.bold)),
+        Text("Riwayat Pengukuran",
+            style: TextStyle(
+                color: navyDark, fontSize: 18, fontWeight: FontWeight.bold)),
         ElevatedButton.icon(
-          onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (context) => const CatatPertumbuhanScreen())),
-          icon: const Icon(Icons.add, size: 16, color: Colors.white),
-          label: const Text("Catat", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+          onPressed: () async {
+            await Navigator.push(
+                context,
+                MaterialPageRoute(
+                    builder: (context) => const CatatPertumbuhanScreen()));
+            _fetchDataAnak();
+          },
+          icon: Icon(Icons.add, size: 16, color: softPink),
+          label: Text("Catat",
+              style:
+                  TextStyle(color: softPink, fontWeight: FontWeight.bold)),
           style: ElevatedButton.styleFrom(
-            backgroundColor: oceanBlue,
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20))
-          ),
+              backgroundColor: navyDark,
+              shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(20))),
         ),
       ],
     );
   }
 
   Widget _buildRiwayatList() {
+    if (_riwayatPertumbuhan.isEmpty) return Center(child: Text("Belum ada riwayat.", style: TextStyle(color: navyDark)));
     return Column(
-      children: [
-        _buildRiwayatCard("5 Februari 2026", "10.4 kg", "80 cm"),
-        const SizedBox(height: 10),
-        _buildRiwayatCard("5 Jan 2026", "10.0 kg", "78 cm"),
-      ],
+      children: _riwayatPertumbuhan
+          .map((r) => _buildRiwayatCard(r['date'].toString(),
+              "${r['weight']} kg", "${r['height']} cm"))
+          .toList(),
     );
   }
 
   Widget _buildRiwayatCard(String date, String bb, String tb) {
     return Container(
-      padding: const EdgeInsets.all(15),
-      decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(15)),
+      margin: const EdgeInsets.only(bottom: 10),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+          color: fieldPink,
+          borderRadius: BorderRadius.circular(15),
+          boxShadow: [
+            BoxShadow(
+              color: navyDark.withOpacity(0.05),
+              blurRadius: 5,
+              offset: const Offset(0, 3),
+            )
+          ]),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(date, style: const TextStyle(color: Colors.grey, fontSize: 12)),
-              const SizedBox(height: 5),
-              Row(children: [
-                Text("BB: $bb", style: TextStyle(color: navyBackground, fontWeight: FontWeight.bold)),
-                const SizedBox(width: 15),
-                Text("TB: $tb", style: TextStyle(color: navyBackground, fontWeight: FontWeight.bold)),
-              ])
-            ]
-          ),
-          Icon(Icons.arrow_forward_ios, color: Colors.grey.withOpacity(0.5), size: 14),
+          Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Text(date, style: TextStyle(color: navyDark.withOpacity(0.6), fontSize: 12)),
+            const SizedBox(height: 6),
+            Row(children: [
+              Text("BB: $bb",
+                  style: TextStyle(
+                      color: navyDark, fontWeight: FontWeight.bold)),
+              const SizedBox(width: 15),
+              Text("TB: $tb",
+                  style: TextStyle(
+                      color: navyDark, fontWeight: FontWeight.bold)),
+            ])
+          ]),
+          Icon(Icons.arrow_forward_ios,
+              color: navyDark.withOpacity(0.3), size: 14),
         ],
       ),
     );
   }
+
+  Widget _buildEmptyState() {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(30.0),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(Icons.child_friendly_rounded,
+                size: 100, color: navyDark.withOpacity(0.3)),
+            const SizedBox(height: 20),
+            Text("Belum Ada Data Anak",
+                style: TextStyle(
+                    color: navyDark,
+                    fontSize: 20,
+                    fontWeight: FontWeight.bold)),
+            const SizedBox(height: 10),
+            Text(
+                "Yuk, tambahkan data si kecil untuk mulai memantau tumbuh kembangnya.",
+                textAlign: TextAlign.center, style: TextStyle(color: navyDark.withOpacity(0.7))),
+            const SizedBox(height: 30),
+            ElevatedButton(
+              onPressed: () async {
+                await Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                        builder: (context) => const DaftarAnakScreen()));
+                _fetchDataAnak();
+              },
+              style: ElevatedButton.styleFrom(
+                  backgroundColor: navyDark,
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 40, vertical: 15),
+                  shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(15))),
+              child: Text("Tambah Data Anak",
+                  style: TextStyle(color: softPink, fontWeight: FontWeight.bold)),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// --- CLASS UNTUK MENGGAMBAR GRAFIK ALA BUKU KIA (CUSTOM PAINT) ---
+class KIAChartPainter extends CustomPainter {
+  final Color lineColor;
+  KIAChartPainter(this.lineColor);
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    // 1. MENGGAMBAR PITA WARNA BUKU KIA (ZONA PERTUMBUHAN)
+    final paintZone = Paint()..style = PaintingStyle.fill;
+
+    // Zona Atas (Risiko Berlebih) - Kuning Lembut
+    paintZone.color = const Color(0xFFFDE68A).withOpacity(0.6); 
+    canvas.drawRect(Rect.fromLTRB(0, 0, size.width, size.height * 0.25), paintZone);
+
+    // Zona Tengah (Pita Hijau KMS / Normal) - Hijau Lembut
+    paintZone.color = const Color(0xFFA5D6A7).withOpacity(0.6); 
+    canvas.drawRect(Rect.fromLTRB(0, size.height * 0.25, size.width, size.height * 0.75), paintZone);
+
+    // Zona Bawah (Risiko Kurang) - Merah/Pink Pucat
+    paintZone.color = const Color(0xFFFCA5A5).withOpacity(0.6); 
+    canvas.drawRect(Rect.fromLTRB(0, size.height * 0.75, size.width, size.height), paintZone);
+
+    // Garis batas antar zona biar rapi
+    final borderPaint = Paint()
+      ..color = const Color(0xFF102C57).withOpacity(0.1)
+      ..strokeWidth = 1
+      ..style = PaintingStyle.stroke;
+    canvas.drawLine(Offset(0, size.height * 0.25), Offset(size.width, size.height * 0.25), borderPaint);
+    canvas.drawLine(Offset(0, size.height * 0.75), Offset(size.width, size.height * 0.75), borderPaint);
+
+    // 2. MENGGAMBAR GARIS PREDIKSI
+    final paintLine = Paint()
+      ..color = lineColor
+      ..strokeWidth = 3.5
+      ..strokeCap = StrokeCap.round
+      ..style = PaintingStyle.stroke;
+
+    final path = Path();
+    
+    // Titik-titik simulasi grafik
+    path.moveTo(0, size.height * 0.85); 
+    path.lineTo(size.width * 0.25, size.height * 0.65); 
+    path.lineTo(size.width * 0.5, size.height * 0.50); 
+    path.lineTo(size.width * 0.75, size.height * 0.40); 
+    path.lineTo(size.width, size.height * 0.15); 
+
+    canvas.drawPath(path, paintLine);
+
+    // 3. MENGGAMBAR TITIK-TITIK PENGUKURAN/PREDIKSI
+    final dotPaint = Paint()..color = lineColor..style = PaintingStyle.fill;
+    canvas.drawCircle(Offset(0, size.height * 0.85), 5, dotPaint);
+    canvas.drawCircle(Offset(size.width * 0.25, size.height * 0.65), 5, dotPaint);
+    canvas.drawCircle(Offset(size.width * 0.5, size.height * 0.50), 5, dotPaint);
+    canvas.drawCircle(Offset(size.width * 0.75, size.height * 0.40), 5, dotPaint);
+    canvas.drawCircle(Offset(size.width, size.height * 0.15), 5, dotPaint);
+  }
+
+  @override
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
 }
