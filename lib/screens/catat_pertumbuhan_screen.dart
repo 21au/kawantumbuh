@@ -8,11 +8,11 @@ class CatatPertumbuhanScreen extends StatefulWidget {
 }
 
 class _CatatPertumbuhanScreenState extends State<CatatPertumbuhanScreen> {
-  // Warna khusus halaman ini
-  final Color navyBackground = const Color(0xFF1A2B4C);
-  final Color pinkCard = const Color(0xFFFFD6D9);
-  final Color greyDateCard = const Color(0xFF867E96);
-  final Color offWhitePink = const Color(0xFFFCE8E9); 
+  // --- PALET WARNA SERAGAM ---
+  final Color navyDark = const Color(0xFF102C57);
+  final Color softPink = const Color(0xFFFFEAEA); 
+  final Color highlightPink = const Color(0xFFD6B5B5); 
+  final Color whiteCard = Colors.white; 
 
   // Controller untuk input ketik manual
   late TextEditingController _beratController;
@@ -45,18 +45,18 @@ class _CatatPertumbuhanScreenState extends State<CatatPertumbuhanScreen> {
     final DateTime? picked = await showDatePicker(
       context: context,
       initialDate: _selectedDate,
-      firstDate: DateTime(2020), // Batas tahun termuda
-      lastDate: DateTime(2030), // Batas tahun tertua
+      firstDate: DateTime(2020), 
+      lastDate: DateTime(2030), 
       builder: (context, child) {
         // Mengubah warna tema kalender agar sesuai desain aplikasi
         return Theme(
           data: Theme.of(context).copyWith(
             colorScheme: ColorScheme.light(
-              primary: navyBackground, 
-              onPrimary: offWhitePink, 
-              onSurface: navyBackground, 
+              primary: navyDark, 
+              onPrimary: Colors.white, 
+              onSurface: navyDark, 
             ),
-            dialogBackgroundColor: offWhitePink,
+            dialogBackgroundColor: softPink,
           ),
           child: child!,
         );
@@ -94,15 +94,18 @@ class _CatatPertumbuhanScreenState extends State<CatatPertumbuhanScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: navyBackground,
+      backgroundColor: softPink, // Background utama jadi pink terang
       body: Column(
         children: [
-          // 1. HEADER
+          // 1. HEADER (Disamakan dengan EditDataAnakScreen -> Navy)
           Container(
             width: double.infinity,
-            padding: const EdgeInsets.only(top: 50, left: 20, right: 20, bottom: 30),
+            padding: EdgeInsets.only(
+              top: MediaQuery.of(context).padding.top + 20, 
+              left: 20, right: 20, bottom: 30
+            ),
             decoration: BoxDecoration(
-              color: pinkCard,
+              color: navyDark,
               borderRadius: const BorderRadius.only(
                 bottomLeft: Radius.circular(30),
                 bottomRight: Radius.circular(30),
@@ -113,26 +116,26 @@ class _CatatPertumbuhanScreenState extends State<CatatPertumbuhanScreen> {
               children: [
                 GestureDetector(
                   onTap: () => Navigator.pop(context),
-                  child: Row(
+                  child: const Row(
                     children: [
-                      Icon(Icons.arrow_back, color: navyBackground, size: 20),
-                      const SizedBox(width: 8),
+                      Icon(Icons.arrow_back, color: Colors.white, size: 20),
+                      SizedBox(width: 8),
                       Text(
                         "Kembali",
-                        style: TextStyle(color: navyBackground, fontWeight: FontWeight.bold, fontSize: 16),
+                        style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 14),
                       ),
                     ],
                   ),
                 ),
-                const SizedBox(height: 25),
-                Text(
+                const SizedBox(height: 20),
+                const Text(
                   "Catat Tumbuh Kembang",
-                  style: TextStyle(color: navyBackground, fontSize: 24, fontWeight: FontWeight.bold),
+                  style: TextStyle(color: Colors.white, fontSize: 24, fontWeight: FontWeight.bold),
                 ),
                 const SizedBox(height: 8),
                 Text(
                   "Isi data pengukuran bulan ini ya, Bun!",
-                  style: TextStyle(color: navyBackground.withOpacity(0.8), fontSize: 16),
+                  style: TextStyle(color: Colors.white.withOpacity(0.8), fontSize: 14),
                 ),
               ],
             ),
@@ -146,16 +149,23 @@ class _CatatPertumbuhanScreenState extends State<CatatPertumbuhanScreen> {
                 children: [
                   // Kartu Tanggal Pengukuran (Bisa Diklik)
                   GestureDetector(
-                    onTap: () => _pilihTanggal(context), // Panggil kalender saat ditekan
+                    onTap: () => _pilihTanggal(context), 
                     child: Container(
                       padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 15),
                       decoration: BoxDecoration(
-                        color: greyDateCard,
+                        color: whiteCard,
                         borderRadius: BorderRadius.circular(15),
+                        boxShadow: [
+                          BoxShadow(
+                            color: navyDark.withOpacity(0.05),
+                            blurRadius: 10,
+                            offset: const Offset(0, 4),
+                          )
+                        ]
                       ),
                       child: Row(
                         children: [
-                          const Icon(Icons.calendar_month, color: Color(0xFFFFA8B6), size: 30),
+                          Icon(Icons.calendar_month, color: navyDark, size: 28),
                           const SizedBox(width: 15),
                           Expanded(
                             child: Column(
@@ -163,18 +173,17 @@ class _CatatPertumbuhanScreenState extends State<CatatPertumbuhanScreen> {
                               children: [
                                 Text(
                                   "Tanggal Pengukuran",
-                                  style: TextStyle(color: offWhitePink.withOpacity(0.8), fontSize: 12),
+                                  style: TextStyle(color: navyDark.withOpacity(0.6), fontSize: 12),
                                 ),
-                                const SizedBox(height: 2),
+                                const SizedBox(height: 4),
                                 Text(
-                                  _formatTanggal(_selectedDate), // Tampilkan tanggal yang dipilih
-                                  style: const TextStyle(color: Color(0xFFFFA8B6), fontWeight: FontWeight.bold, fontSize: 14),
+                                  _formatTanggal(_selectedDate), 
+                                  style: TextStyle(color: navyDark, fontWeight: FontWeight.bold, fontSize: 15),
                                 ),
                               ],
                             ),
                           ),
-                          // Ikon panah sebagai petunjuk bisa diedit
-                          Icon(Icons.keyboard_arrow_down, color: offWhitePink.withOpacity(0.8)),
+                          Icon(Icons.keyboard_arrow_down, color: navyDark.withOpacity(0.5)),
                         ],
                       ),
                     ),
@@ -223,10 +232,12 @@ class _CatatPertumbuhanScreenState extends State<CatatPertumbuhanScreen> {
                     height: 55,
                     child: ElevatedButton(
                       style: ElevatedButton.styleFrom(
-                        backgroundColor: pinkCard,
+                        backgroundColor: navyDark,
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(15),
                         ),
+                        elevation: 5,
+                        shadowColor: navyDark.withOpacity(0.3),
                       ),
                       onPressed: () {
                         // Tampilkan nilai asli yang diinput ke console (sebagai bukti untuk backend nanti)
@@ -236,19 +247,19 @@ class _CatatPertumbuhanScreenState extends State<CatatPertumbuhanScreen> {
                         print("Lingkar Kepala: ${_lingkarController.text}");
 
                         ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(
+                          const SnackBar(
                             content: Text(
                               'Data berhasil disimpan!',
-                              style: TextStyle(color: navyBackground, fontWeight: FontWeight.bold),
+                              style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
                             ),
-                            backgroundColor: pinkCard,
+                            backgroundColor: Colors.green,
                           ),
                         );
                         Navigator.pop(context);
                       },
-                      child: Text(
+                      child: const Text(
                         "Simpan Data",
-                        style: TextStyle(color: navyBackground, fontSize: 18, fontWeight: FontWeight.bold),
+                        style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold),
                       ),
                     ),
                   ),
@@ -275,8 +286,15 @@ class _CatatPertumbuhanScreenState extends State<CatatPertumbuhanScreen> {
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
-        color: pinkCard,
+        color: whiteCard,
         borderRadius: BorderRadius.circular(20),
+        boxShadow: [
+          BoxShadow(
+            color: navyDark.withOpacity(0.04),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
+          )
+        ]
       ),
       child: Column(
         children: [
@@ -284,8 +302,8 @@ class _CatatPertumbuhanScreenState extends State<CatatPertumbuhanScreen> {
             children: [
               Container(
                 padding: const EdgeInsets.all(10),
-                decoration: BoxDecoration(color: navyBackground, borderRadius: BorderRadius.circular(12)),
-                child: Icon(icon, color: pinkCard, size: 24),
+                decoration: BoxDecoration(color: softPink, shape: BoxShape.circle),
+                child: Icon(icon, color: navyDark, size: 22),
               ),
               const SizedBox(width: 15),
               Column(
@@ -293,44 +311,49 @@ class _CatatPertumbuhanScreenState extends State<CatatPertumbuhanScreen> {
                 children: [
                   Text(
                     title,
-                    style: TextStyle(color: navyBackground, fontSize: 16, fontWeight: FontWeight.bold),
+                    style: TextStyle(color: navyDark, fontSize: 16, fontWeight: FontWeight.bold),
                   ),
+                  const SizedBox(height: 2),
                   Text(
                     subtitle,
-                    style: TextStyle(color: navyBackground.withOpacity(0.7), fontSize: 12),
+                    style: TextStyle(color: navyDark.withOpacity(0.6), fontSize: 12),
                   ),
                 ],
               ),
             ],
           ),
-          const SizedBox(height: 20),
+          const SizedBox(height: 25),
           Row(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
               // Tombol Minus
               InkWell(
                 onTap: onMinus,
+                borderRadius: BorderRadius.circular(12),
                 child: Container(
-                  width: 50,
-                  height: 50,
-                  decoration: BoxDecoration(color: navyBackground, borderRadius: BorderRadius.circular(12)),
-                  child: Icon(Icons.remove, color: offWhitePink),
+                  width: 45,
+                  height: 45,
+                  decoration: BoxDecoration(
+                    color: highlightPink.withOpacity(0.3), 
+                    borderRadius: BorderRadius.circular(12)
+                  ),
+                  child: Icon(Icons.remove, color: navyDark),
                 ),
               ),
               const SizedBox(width: 20),
               
-              // Nilai Angka (Sekarang berupa TextField yang bisa diketik)
+              // Nilai Angka (TextField yang bisa diketik)
               Column(
                 children: [
                   SizedBox(
-                    width: 70, // Lebar area ketik
+                    width: 80, 
                     child: TextField(
                       controller: controller,
                       keyboardType: const TextInputType.numberWithOptions(decimal: true),
                       textAlign: TextAlign.center,
-                      style: TextStyle(color: navyBackground, fontSize: 32, fontWeight: FontWeight.bold),
+                      style: TextStyle(color: navyDark, fontSize: 32, fontWeight: FontWeight.bold),
                       decoration: const InputDecoration(
-                        border: InputBorder.none, // Hilangkan garis bawah default TextField
+                        border: InputBorder.none, 
                         isDense: true,
                         contentPadding: EdgeInsets.zero,
                       ),
@@ -338,7 +361,7 @@ class _CatatPertumbuhanScreenState extends State<CatatPertumbuhanScreen> {
                   ),
                   Text(
                     unit,
-                    style: TextStyle(color: navyBackground, fontSize: 16, fontWeight: FontWeight.bold),
+                    style: TextStyle(color: navyDark.withOpacity(0.6), fontSize: 14, fontWeight: FontWeight.bold),
                   ),
                 ],
               ),
@@ -347,11 +370,15 @@ class _CatatPertumbuhanScreenState extends State<CatatPertumbuhanScreen> {
               // Tombol Plus
               InkWell(
                 onTap: onPlus,
+                borderRadius: BorderRadius.circular(12),
                 child: Container(
-                  width: 50,
-                  height: 50,
-                  decoration: BoxDecoration(color: navyBackground, borderRadius: BorderRadius.circular(12)),
-                  child: Icon(Icons.add, color: offWhitePink),
+                  width: 45,
+                  height: 45,
+                  decoration: BoxDecoration(
+                    color: navyDark, 
+                    borderRadius: BorderRadius.circular(12)
+                  ),
+                  child: const Icon(Icons.add, color: Colors.white),
                 ),
               ),
             ],

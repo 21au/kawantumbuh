@@ -1,26 +1,104 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 class EditDataAnakScreen extends StatefulWidget {
-  const EditDataAnakScreen({super.key});
+  final Map<String, dynamic> dataAnak; // Menerima data dari halaman sebelumnya
+
+  const EditDataAnakScreen({super.key, required this.dataAnak});
 
   @override
   State<EditDataAnakScreen> createState() => _EditDataAnakScreenState();
 }
 
 class _EditDataAnakScreenState extends State<EditDataAnakScreen> {
-  // --- PALET WARNA BARU SESUAI TEMA BUNDA ---
+  // --- PALET WARNA ---
   final Color navyDark = const Color(0xFF102C57);
   final Color softPink = const Color(0xFFFFEAEA); 
-  final Color highlightPink = const Color(0xFFD6B5B5); // Dusty pink untuk aksen
-  final Color whiteCard = Colors.white; // Biar formnya bersih dan menonjol
+  final Color highlightPink = const Color(0xFFD6B5B5); 
+  final Color whiteCard = Colors.white; 
 
-  // --- STATE ---
-  String selectedGender = 'Perempuan';
+  // --- STATE & CONTROLLERS ---
+  bool _isLoading = false;
+  late String selectedGender;
   String? selectedGolDarah; 
-  final TextEditingController _dateController = TextEditingController();
   
   final List<String> golDarahList = ['A', 'B', 'AB', 'O', 'Belum Tahu'];
+
+  // Menggunakan nama controller persis seperti kode aslimu
+  late TextEditingController _namaController;
+  late TextEditingController _dateController;
+  late TextEditingController _namaIbuController;
+  late TextEditingController _namaAyahController;
+  late TextEditingController _alamatController;
+  late TextEditingController _noTelpController;
+  late TextEditingController _catatanAlergiController;
+
+  @override
+  void initState() {
+    super.initState();
+    // Isi otomatis form dengan data yang sudah ada di database
+    _namaController = TextEditingController(text: widget.dataAnak['nama'] ?? '');
+    _dateController = TextEditingController(text: widget.dataAnak['tanggal_lahir'] ?? '');
+    _namaIbuController = TextEditingController(text: widget.dataAnak['nama_ibu'] ?? '');
+    _namaAyahController = TextEditingController(text: widget.dataAnak['nama_ayah'] ?? '');
+    _alamatController = TextEditingController(text: widget.dataAnak['alamat'] ?? '');
+    _noTelpController = TextEditingController(text: widget.dataAnak['no_telp'] ?? '');
+    _catatanAlergiController = TextEditingController(text: widget.dataAnak['catatan_alergi'] ?? '');
+    
+    selectedGender = widget.dataAnak['jenis_kelamin'] ?? 'Perempuan';
+    
+    String? dbGolDarah = widget.dataAnak['golongan_darah'];
+    if (dbGolDarah != null && golDarahList.contains(dbGolDarah)) {
+      selectedGolDarah = dbGolDarah;
+    }
+  }
+
+  @override
+  void dispose() {
+    _namaController.dispose();
+    _dateController.dispose();
+    _namaIbuController.dispose();
+    _namaAyahController.dispose();
+    _alamatController.dispose();
+    _noTelpController.dispose();
+    _catatanAlergiController.dispose();
+    super.dispose();
+  }
+
+  // --- FUNGSI SIMPAN KE SUPABASE ---
+  Future<void> _simpanData() async {
+    setState(() => _isLoading = true);
+
+    try {
+      await Supabase.instance.client.from('anak').update({
+        'nama': _namaController.text,
+        'jenis_kelamin': selectedGender,
+        'tanggal_lahir': _dateController.text,
+        'golongan_darah': selectedGolDarah,
+        'nama_ibu': _namaIbuController.text,
+        'nama_ayah': _namaAyahController.text,
+        'alamat': _alamatController.text,
+        'no_telp': _noTelpController.text,
+        'catatan_alergi': _catatanAlergiController.text,
+      }).eq('id', widget.dataAnak['id']);
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text("Data berhasil diperbarui!"), backgroundColor: Colors.green),
+        );
+        Navigator.pop(context); // Kembali ke halaman sebelumnya
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text("Gagal menyimpan: $e"), backgroundColor: Colors.red),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
+    }
+  }
 
   // Fungsi Kalender
   Future<void> _selectDate(BuildContext context) async {
@@ -33,9 +111,9 @@ class _EditDataAnakScreenState extends State<EditDataAnakScreen> {
         return Theme(
           data: Theme.of(context).copyWith(
             colorScheme: ColorScheme.light(
-              primary: navyDark, // Warna header kalender
-              onPrimary: Colors.white, // Warna teks di header
-              onSurface: navyDark, // Warna teks tanggal
+              primary: navyDark, 
+              onPrimary: Colors.white, 
+              onSurface: navyDark, 
             ),
           ),
           child: child!,
@@ -52,10 +130,10 @@ class _EditDataAnakScreenState extends State<EditDataAnakScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: softPink, // Background utama soft pink
+      backgroundColor: softPink,
       body: Column(
         children: [
-          // --- HEADER ANTI OVERFLOW ---
+          // --- HEADER ---
           Container(
             width: double.infinity,
             padding: EdgeInsets.only(
@@ -74,11 +152,11 @@ class _EditDataAnakScreenState extends State<EditDataAnakScreen> {
               children: [
                 GestureDetector(
                   onTap: () => Navigator.pop(context),
-                  child: Row(
+                  child: const Row(
                     children: [
-                      const Icon(Icons.arrow_back, color: Colors.white, size: 20),
-                      const SizedBox(width: 5),
-                      const Text("Kembali", style: TextStyle(color: Colors.white, fontSize: 14)),
+                      Icon(Icons.arrow_back, color: Colors.white, size: 20),
+                      SizedBox(width: 5),
+                      Text("Kembali", style: TextStyle(color: Colors.white, fontSize: 14)),
                     ],
                   ),
                 ),
@@ -101,7 +179,7 @@ class _EditDataAnakScreenState extends State<EditDataAnakScreen> {
                     title: "Identitas Anak",
                     children: [
                       _buildLabel("Nama Lengkap Anak", isRequired: true),
-                      _buildTextField(hint: "Contoh: Aisyah Putri"),
+                      _buildTextField(hint: "Contoh: Aisyah Putri", controller: _namaController),
                       const SizedBox(height: 15),
                       
                       _buildLabel("Jenis Kelamin", isRequired: true),
@@ -118,11 +196,7 @@ class _EditDataAnakScreenState extends State<EditDataAnakScreen> {
                       ),
                       const SizedBox(height: 15),
                       
-                      _buildLabel("Tempat Lahir"),
-                      _buildTextField(hint: "Contoh: Jakarta", icon: Icons.location_on_outlined),
-                      const SizedBox(height: 15),
-                      
-                      _buildLabel("Golongan Darah (Opsional)"),
+                      _buildLabel("Golongan Darah"),
                       _buildDropdownGolDarah(),
                     ],
                   ),
@@ -134,10 +208,10 @@ class _EditDataAnakScreenState extends State<EditDataAnakScreen> {
                     title: "Data Orang Tua",
                     children: [
                       _buildLabel("Nama Ibu", isRequired: true),
-                      _buildTextField(hint: "Nama lengkap ibu", icon: Icons.person_outline),
+                      _buildTextField(hint: "Nama lengkap ibu", icon: Icons.person_outline, controller: _namaIbuController),
                       const SizedBox(height: 15),
                       _buildLabel("Nama Ayah"),
-                      _buildTextField(hint: "Nama lengkap ayah", icon: Icons.person_outline),
+                      _buildTextField(hint: "Nama lengkap ayah", icon: Icons.person_outline, controller: _namaAyahController),
                     ],
                   ),
                   const SizedBox(height: 15),
@@ -148,10 +222,25 @@ class _EditDataAnakScreenState extends State<EditDataAnakScreen> {
                     title: "Kontak",
                     children: [
                       _buildLabel("Alamat Lengkap"),
-                      _buildTextField(hint: "Jalan, RT/RW, Kecamatan", maxLines: 2),
+                      _buildTextField(hint: "Jalan, RT/RW, Kecamatan", maxLines: 2, controller: _alamatController),
                       const SizedBox(height: 15),
                       _buildLabel("Nomor Telepon"),
-                      _buildTextField(hint: "08xx xxxx xxxx", icon: Icons.call_outlined, keyboardType: TextInputType.phone),
+                      _buildTextField(hint: "08xx xxxx xxxx", icon: Icons.call_outlined, keyboardType: TextInputType.phone, controller: _noTelpController),
+                    ],
+                  ),
+                  const SizedBox(height: 15),
+
+                  // CARD 4: CATATAN KESEHATAN
+                  _buildSectionCard(
+                    icon: Icons.medical_information_outlined,
+                    title: "Catatan Medis",
+                    children: [
+                      _buildLabel("Riwayat Alergi / Kondisi Khusus"),
+                      _buildTextField(
+                        hint: "Contoh: Alergi susu sapi, asma, GTM parah, dll...", 
+                        maxLines: 3, 
+                        controller: _catatanAlergiController,
+                      ),
                     ],
                   ),
                   const SizedBox(height: 30),
@@ -161,14 +250,16 @@ class _EditDataAnakScreenState extends State<EditDataAnakScreen> {
                     width: double.infinity,
                     height: 55,
                     child: ElevatedButton(
-                      onPressed: () => Navigator.pop(context),
+                      onPressed: _isLoading ? null : _simpanData,
                       style: ElevatedButton.styleFrom(
                         backgroundColor: navyDark,
                         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
                         elevation: 5,
                         shadowColor: navyDark.withOpacity(0.3),
                       ),
-                      child: const Text("Simpan Data", style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)),
+                      child: _isLoading 
+                        ? const CircularProgressIndicator(color: Colors.white)
+                        : const Text("Simpan Data", style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)),
                     ),
                   ),
                   const SizedBox(height: 20),
@@ -182,7 +273,6 @@ class _EditDataAnakScreenState extends State<EditDataAnakScreen> {
   }
 
   // --- WIDGET HELPERS ---
-
   Widget _buildSectionCard({IconData? icon, required String title, required List<Widget> children}) {
     return Container(
       width: double.infinity,
@@ -247,7 +337,7 @@ class _EditDataAnakScreenState extends State<EditDataAnakScreen> {
         hintStyle: TextStyle(color: navyDark.withOpacity(0.4)),
         prefixIcon: icon != null ? Icon(icon, color: navyDark.withOpacity(0.5), size: 20) : null,
         filled: true,
-        fillColor: Colors.white,
+        fillColor: softPink.withOpacity(0.2), 
         contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
         enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide(color: highlightPink.withOpacity(0.5))),
         focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide(color: navyDark, width: 1.5)),
@@ -259,7 +349,7 @@ class _EditDataAnakScreenState extends State<EditDataAnakScreen> {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 2),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: softPink.withOpacity(0.2),
         borderRadius: BorderRadius.circular(12),
         border: Border.all(color: highlightPink.withOpacity(0.5)),
       ),
@@ -303,7 +393,7 @@ class _EditDataAnakScreenState extends State<EditDataAnakScreen> {
         duration: const Duration(milliseconds: 200),
         padding: const EdgeInsets.symmetric(vertical: 14),
         decoration: BoxDecoration(
-          color: isSelected ? highlightPink : Colors.white,
+          color: isSelected ? highlightPink : softPink.withOpacity(0.2),
           borderRadius: BorderRadius.circular(12),
           border: Border.all(color: isSelected ? navyDark : highlightPink.withOpacity(0.5), width: isSelected ? 1.5 : 1),
         ),

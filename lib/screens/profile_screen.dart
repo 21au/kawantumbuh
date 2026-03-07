@@ -2,6 +2,7 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart'; 
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:url_launcher/url_launcher.dart'; // Import untuk membuka WhatsApp
 
 import 'edit_profile_screen.dart'; 
 import 'daftar_anak_screen.dart'; 
@@ -88,6 +89,100 @@ class _ProfileScreenState extends State<ProfileScreen> {
     } finally {
       if (mounted) setState(() => _isUploading = false);
     }
+  }
+
+  // --- FUNGSI MENGHUBUNGI ADMIN VIA WHATSAPP DENGAN PESAN DINAMIS ---
+  Future<void> _hubungiAdmin(String pesanSpesifik) async {
+    // Tanda + dihilangkan agar link wa.me lebih stabil terbaca
+    final String nomorAdmin = "6282143544981"; 
+    
+    final Uri url = Uri.parse("https://wa.me/$nomorAdmin?text=${Uri.encodeComponent(pesanSpesifik)}");
+
+    try {
+      if (await canLaunchUrl(url)) {
+        await launchUrl(url, mode: LaunchMode.externalApplication);
+      } else {
+        throw "Tidak bisa membuka WhatsApp";
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: const Text("Gagal membuka WhatsApp. Pastikan WhatsApp sudah terinstal ya, Bunda."), 
+            backgroundColor: highlightPink,
+          ),
+        );
+      }
+    }
+  }
+
+  // --- POP-UP PILIHAN MENU BANTUAN ---
+  void _tampilkanPilihanBantuan(BuildContext context) {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: softPink,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(25)),
+      ),
+      builder: (context) {
+        return Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 25),
+          child: Column(
+            mainAxisSize: MainAxisSize.min, // Sesuaikan tinggi dengan isi otomatis
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text("Apa yang bisa kami bantu, Bunda?", style: TextStyle(color: navyDark, fontSize: 18, fontWeight: FontWeight.bold)),
+              const SizedBox(height: 5),
+              Text("Pilih topik kendala agar kami bisa cepat membantu:", style: TextStyle(color: navyDark.withOpacity(0.6), fontSize: 13)),
+              const SizedBox(height: 20),
+              
+              // Pilihan 1: Ganti Nomor HP
+              _buildOpsiBantuan(
+                icon: Icons.phone_android_rounded,
+                judul: "Ganti Nomor Handphone",
+                pesan: "Halo Admin KawanTumbuh, nomor HP saya sudah tidak aktif. Saya ingin mengajukan pergantian nomor untuk akun saya.",
+              ),
+              
+              // Pilihan 2: Kendala Data Anak
+              _buildOpsiBantuan(
+                icon: Icons.child_care_rounded,
+                judul: "Kendala Data Anak",
+                pesan: "Halo Admin KawanTumbuh, saya mengalami kesulitan saat mengisi/mengubah data pertumbuhan anak saya. Mohon bantuannya.",
+              ),
+              
+              // Pilihan 3: Tanya Lainnya
+              _buildOpsiBantuan(
+                icon: Icons.help_outline_rounded,
+                judul: "Pertanyaan Lainnya",
+                pesan: "Halo Admin KawanTumbuh, saya ingin bertanya sesuatu seputar penggunaan aplikasi ini.",
+              ),
+              
+              const SizedBox(height: 10),
+            ],
+          ),
+        );
+      }
+    );
+  }
+
+  // --- WIDGET TOMBOL UNTUK POP-UP BANTUAN ---
+  Widget _buildOpsiBantuan({required IconData icon, required String judul, required String pesan}) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 10),
+      decoration: BoxDecoration(
+        color: fieldPink.withOpacity(0.5),
+        borderRadius: BorderRadius.circular(15),
+      ),
+      child: ListTile(
+        leading: Icon(icon, color: navyDark),
+        title: Text(judul, style: TextStyle(color: navyDark, fontWeight: FontWeight.w600, fontSize: 14)),
+        trailing: Icon(Icons.arrow_forward_ios_rounded, size: 14, color: navyDark.withOpacity(0.5)),
+        onTap: () {
+          Navigator.pop(context); // Tutup pop-up pilihan dulu
+          _hubungiAdmin(pesan);   // Baru buka WhatsApp dengan pesan khusus
+        },
+      ),
+    );
   }
 
   @override
@@ -206,7 +301,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
             Navigator.push(context, MaterialPageRoute(builder: (context) => const DaftarAnakScreen()));
           }),
           _buildMenuItem(Icons.help_outline_rounded, "Pusat Bantuan", () {
-            // Aksi bantuan
+            _tampilkanPilihanBantuan(context); // Memanggil pop-up pilihan bantuan
           }),
         ],
       ),

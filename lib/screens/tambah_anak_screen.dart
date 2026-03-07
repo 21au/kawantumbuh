@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
-import 'package:kawantumbuh/utils/app_colors.dart';
 
 class TambahAnakScreen extends StatefulWidget {
   const TambahAnakScreen({super.key});
@@ -10,10 +9,11 @@ class TambahAnakScreen extends StatefulWidget {
 }
 
 class _TambahAnakScreenState extends State<TambahAnakScreen> {
-  final Color navyBackground = const Color(0xFF1A2B4C);
-  final Color oceanBlue = const Color(0xFF1E88B3);
-  // Warna pengganti putih (Pink sangat muda agar senada dengan background)
-  final Color softInputColor = const Color(0xFFFDEEF1); 
+  // --- PALET WARNA UTAMA BUNDA ---
+  final Color navyDark = const Color(0xFF102C57);      
+  final Color softPink = const Color(0xFFFFEAEA);      
+  final Color fieldPink = const Color(0xFFF5CBCB);     
+  final Color highlightPink = const Color(0xFFEBA9A9); 
   
   final TextEditingController _namaController = TextEditingController();
   final TextEditingController _usiaController = TextEditingController();
@@ -23,6 +23,7 @@ class _TambahAnakScreenState extends State<TambahAnakScreen> {
   
   String _genderPilihan = 'Laki-laki'; 
   DateTime? _tanggalPengukuran;
+  DateTime? _tanggalLahir; // Variabel baru untuk Tanggal Lahir
   bool _isLoading = false;
 
   @override
@@ -35,28 +36,34 @@ class _TambahAnakScreenState extends State<TambahAnakScreen> {
     super.dispose();
   }
 
-  Future<void> _pilihTanggal(BuildContext context) async {
+  // Fungsi Pilihan Tanggal (Dibuat lebih fleksibel untuk 2 input berbeda)
+  Future<void> _pilihTanggal(BuildContext context, {required bool isTanggalLahir}) async {
     final DateTime? picked = await showDatePicker(
       context: context,
       initialDate: DateTime.now(),
-      firstDate: DateTime(2020),
-      lastDate: DateTime.now(),
+      firstDate: DateTime(2015), // Batas tahun mundur
+      lastDate: DateTime.now(), // Tidak bisa pilih tanggal masa depan
       builder: (context, child) {
         return Theme(
           data: Theme.of(context).copyWith(
             colorScheme: ColorScheme.light(
-              primary: navyBackground,
-              onPrimary: softInputColor, // Teks di atas tombol kalender
-              onSurface: navyBackground,
+              primary: navyDark, // Warna header & tombol aktif
+              onPrimary: softPink, // Warna teks di atas primary
+              surface: softPink, // Background kalender
+              onSurface: navyDark, // Teks angka kalender
             ),
           ),
           child: child!,
         );
       },
     );
-    if (picked != null && picked != _tanggalPengukuran) {
+    if (picked != null) {
       setState(() {
-        _tanggalPengukuran = picked;
+        if (isTanggalLahir) {
+          _tanggalLahir = picked;
+        } else {
+          _tanggalPengukuran = picked;
+        }
       });
     }
   }
@@ -64,14 +71,22 @@ class _TambahAnakScreenState extends State<TambahAnakScreen> {
   Future<void> _simpanDataAnak() async {
     if (_namaController.text.trim().isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("Nama anak tidak boleh kosong ya!"), backgroundColor: Colors.orange),
+        SnackBar(content: const Text("Nama anak tidak boleh kosong ya!"), backgroundColor: highlightPink),
+      );
+      return;
+    }
+
+    // Validasi Tanggal Lahir
+    if (_tanggalLahir == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: const Text("Mohon pilih tanggal lahir si kecil!"), backgroundColor: highlightPink),
       );
       return;
     }
 
     if (_tanggalPengukuran == null) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("Mohon pilih tanggal pengukuran terakhir!"), backgroundColor: Colors.orange),
+        SnackBar(content: const Text("Mohon pilih tanggal pengukuran terakhir!"), backgroundColor: highlightPink),
       );
       return;
     }
@@ -82,34 +97,51 @@ class _TambahAnakScreenState extends State<TambahAnakScreen> {
       final user = Supabase.instance.client.auth.currentUser;
       if (user == null) throw Exception("Sesi login tidak ditemukan.");
 
-      String formattedDate = "${_tanggalPengukuran!.year}-${_tanggalPengukuran!.month.toString().padLeft(2, '0')}-${_tanggalPengukuran!.day.toString().padLeft(2, '0')}";
+      // Format ke String "YYYY-MM-DD" untuk Supabase
+      String formatTglPengukuran = "${_tanggalPengukuran!.year}-${_tanggalPengukuran!.month.toString().padLeft(2, '0')}-${_tanggalPengukuran!.day.toString().padLeft(2, '0')}";
+      String formatTglLahir = "${_tanggalLahir!.year}-${_tanggalLahir!.month.toString().padLeft(2, '0')}-${_tanggalLahir!.day.toString().padLeft(2, '0')}";
 
       int? usiaAngka = int.tryParse(_usiaController.text.trim().replaceAll(RegExp(r'[^0-9]'), ''));
       double? beratAngka = double.tryParse(_beratController.text.trim().replaceAll(',', '.'));
       double? tinggiAngka = double.tryParse(_tinggiController.text.trim().replaceAll(',', '.'));
       double? lingkarKepalaAngka = double.tryParse(_lingkarKepalaController.text.trim().replaceAll(',', '.'));
 
-      await Supabase.instance.client.from('anak').insert({
+      // 1. PROSES SIMPAN KE TABEL 'anak' 
+      // Menggunakan .select().single() agar kita mendapat 'id' anak yang baru terbuat
+      final responseAnak = await Supabase.instance.client.from('anak').insert({
         'user_id': user.id,
         'nama': _namaController.text.trim(),
         'jenis_kelamin': _genderPilihan,
+        'tanggal_lahir': formatTglLahir,
         'usia': usiaAngka,
         'berat': beratAngka,
         'tinggi': tinggiAngka,
         'lingkar_kepala': lingkarKepalaAngka,
-        'tanggal_pengukuran': formattedDate,
+        'tanggal_pengukuran': formatTglPengukuran,
+      }).select().single();
+
+      // Ambil ID anak dari response
+      final String idAnakBaru = responseAnak['id'].toString();
+
+      // 2. PROSES SIMPAN KE TABEL 'pertumbuhan' SEBAGAI DATA AWAL (Untuk Prophet)
+      await Supabase.instance.client.from('pertumbuhan').insert({
+        'anak_id': idAnakBaru,
+        'tanggal_pengukuran': formatTglPengukuran,
+        'berat_badan': beratAngka ?? 0.0,
+        'tinggi_badan': tinggiAngka ?? 0.0,
+        'lingkar_kepala': lingkarKepalaAngka ?? 0.0,
       });
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text("Data anak berhasil ditambahkan! 🎉"), backgroundColor: Colors.green),
+          SnackBar(content: const Text("Data anak & profil pertumbuhan awal berhasil disimpan! 🎉"), backgroundColor: navyDark),
         );
         Navigator.pop(context); 
       }
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text("Gagal menyimpan data: $e"), backgroundColor: Colors.red),
+          SnackBar(content: Text("Gagal menyimpan data: $e"), backgroundColor: Colors.red[400]),
         );
       }
     } finally {
@@ -122,14 +154,14 @@ class _TambahAnakScreenState extends State<TambahAnakScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: AppColors.lightPink,
+      backgroundColor: softPink,
       appBar: AppBar(
-        title: const Text("Tambah Data Anak", style: TextStyle(color: Colors.white, fontSize: 18)),
-        backgroundColor: navyBackground,
+        title: Text("Tambah Data Anak", style: TextStyle(color: softPink, fontSize: 18, fontWeight: FontWeight.bold)),
+        backgroundColor: navyDark,
         centerTitle: true,
         elevation: 0,
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back_ios, color: Colors.white),
+          icon: Icon(Icons.arrow_back_ios_new_rounded, color: softPink),
           onPressed: () => Navigator.pop(context),
         ),
       ),
@@ -141,35 +173,23 @@ class _TambahAnakScreenState extends State<TambahAnakScreen> {
             _buildInputLabel("Nama Lengkap Anak"),
             _buildTextField(_namaController, "Masukkan nama anak", Icons.person_outline),
             
+            // --- BAGIAN TANGGAL LAHIR ---
+            _buildInputLabel("Tanggal Lahir"),
+            _buildDatePicker(
+              tanggal: _tanggalLahir, 
+              hint: "Pilih Tanggal Lahir", 
+              onTap: () => _pilihTanggal(context, isTanggalLahir: true)
+            ),
+            
             _buildInputLabel("Usia (dalam Bulan)"),
             _buildTextField(_usiaController, "Contoh: 18", Icons.cake_outlined, isNumber: true),
 
+            // --- BAGIAN TANGGAL PENGUKURAN ---
             _buildInputLabel("Tanggal Pengukuran Terakhir"),
-            GestureDetector(
-              onTap: () => _pilihTanggal(context),
-              child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 15, vertical: 15),
-                decoration: BoxDecoration(
-                  color: softInputColor, // Ganti putih jadi pink muda
-                  borderRadius: BorderRadius.circular(15),
-                  border: Border.all(color: navyBackground.withOpacity(0.1)),
-                ),
-                child: Row(
-                  children: [
-                    Icon(Icons.calendar_month, color: oceanBlue),
-                    const SizedBox(width: 10),
-                    Text(
-                      _tanggalPengukuran == null 
-                          ? "Pilih Tanggal Pengukuran" 
-                          : "${_tanggalPengukuran!.day}/${_tanggalPengukuran!.month}/${_tanggalPengukuran!.year}",
-                      style: TextStyle(
-                        fontSize: 14, 
-                        color: _tanggalPengukuran == null ? Colors.grey.shade500 : navyBackground,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
+            _buildDatePicker(
+              tanggal: _tanggalPengukuran, 
+              hint: "Pilih Tanggal Pengukuran", 
+              onTap: () => _pilihTanggal(context, isTanggalLahir: false)
             ),
             
             const SizedBox(height: 5),
@@ -200,11 +220,11 @@ class _TambahAnakScreenState extends State<TambahAnakScreen> {
             _buildInputLabel("Lingkar Kepala (cm)"),
             _buildTextField(_lingkarKepalaController, "Contoh: 45.5", Icons.face, isNumber: true),
             
-            const Padding(
-              padding: EdgeInsets.only(top: 10.0, left: 4.0),
+            Padding(
+              padding: const EdgeInsets.only(top: 10.0, left: 4.0),
               child: Text(
-                "* Isi berat, tinggi, dan lingkar kepala sesuai dengan hasil pengukuran terakhir ya, Bunda.",
-                style: TextStyle(color: Color(0xFF8E8E8E), fontSize: 12, fontStyle: FontStyle.italic),
+                "* Isi berat, tinggi, dan lingkar kepala sesuai dengan hasil pengukuran terakhir ya, Bunda. Data ini akan jadi patokan awal kurva pertumbuhannya.",
+                style: TextStyle(color: navyDark.withOpacity(0.5), fontSize: 12, fontStyle: FontStyle.italic),
               ),
             ),
 
@@ -212,28 +232,28 @@ class _TambahAnakScreenState extends State<TambahAnakScreen> {
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
               decoration: BoxDecoration(
-                color: softInputColor, // Ganti putih jadi pink muda
+                color: fieldPink.withOpacity(0.5),
                 borderRadius: BorderRadius.circular(15),
-                border: Border.all(color: navyBackground.withOpacity(0.1)),
+                border: Border.all(color: navyDark.withOpacity(0.1)),
               ),
               child: Row(
                 children: [
                   Expanded(
                     child: RadioListTile<String>(
-                      title: Text("Laki-laki", style: TextStyle(fontSize: 14, color: navyBackground)),
+                      title: Text("Laki-laki", style: TextStyle(fontSize: 14, color: navyDark, fontWeight: FontWeight.w500)),
                       value: 'Laki-laki',
                       groupValue: _genderPilihan,
-                      activeColor: oceanBlue,
+                      activeColor: navyDark,
                       contentPadding: EdgeInsets.zero,
                       onChanged: (value) => setState(() => _genderPilihan = value!),
                     ),
                   ),
                   Expanded(
                     child: RadioListTile<String>(
-                      title: Text("Perempuan", style: TextStyle(fontSize: 14, color: navyBackground)),
+                      title: Text("Perempuan", style: TextStyle(fontSize: 14, color: navyDark, fontWeight: FontWeight.w500)),
                       value: 'Perempuan',
                       groupValue: _genderPilihan,
-                      activeColor: Colors.pinkAccent,
+                      activeColor: highlightPink,
                       contentPadding: EdgeInsets.zero,
                       onChanged: (value) => setState(() => _genderPilihan = value!),
                     ),
@@ -250,13 +270,13 @@ class _TambahAnakScreenState extends State<TambahAnakScreen> {
               child: ElevatedButton(
                 onPressed: _isLoading ? null : _simpanDataAnak,
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: oceanBlue,
+                  backgroundColor: navyDark,
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
                   elevation: 2,
                 ),
                 child: _isLoading 
-                    ? const CircularProgressIndicator(color: Colors.white)
-                    : const Text("Simpan Data", style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)),
+                    ? CircularProgressIndicator(color: softPink)
+                    : Text("Simpan Data", style: TextStyle(color: softPink, fontSize: 16, fontWeight: FontWeight.bold)),
               ),
             ),
           ],
@@ -265,12 +285,13 @@ class _TambahAnakScreenState extends State<TambahAnakScreen> {
     );
   }
 
+  // --- WIDGET HELPER ---
   Widget _buildInputLabel(String label) {
     return Padding(
       padding: const EdgeInsets.only(top: 20, bottom: 8),
       child: Text(
         label,
-        style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: navyBackground),
+        style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: navyDark),
       ),
     );
   }
@@ -278,23 +299,48 @@ class _TambahAnakScreenState extends State<TambahAnakScreen> {
   Widget _buildTextField(TextEditingController controller, String hint, IconData icon, {bool isNumber = false}) {
     return TextField(
       controller: controller,
-      style: TextStyle(color: navyBackground),
+      style: TextStyle(color: navyDark, fontWeight: FontWeight.w500),
       keyboardType: isNumber ? const TextInputType.numberWithOptions(decimal: true) : TextInputType.text,
       decoration: InputDecoration(
         hintText: hint,
-        hintStyle: TextStyle(color: Colors.grey.shade500, fontSize: 13),
-        prefixIcon: Icon(icon, color: oceanBlue),
+        hintStyle: TextStyle(color: navyDark.withOpacity(0.4), fontSize: 13),
+        prefixIcon: Icon(icon, color: navyDark.withOpacity(0.7)),
         filled: true,
-        fillColor: softInputColor, // Warna input pink sangat muda
+        fillColor: fieldPink.withOpacity(0.5), 
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(15),
-          borderSide: BorderSide(color: navyBackground.withOpacity(0.1)),
-        ),
-        enabledBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(15),
-          borderSide: BorderSide(color: navyBackground.withOpacity(0.05)),
+          borderSide: BorderSide.none,
         ),
         contentPadding: const EdgeInsets.symmetric(vertical: 15),
+      ),
+    );
+  }
+
+  Widget _buildDatePicker({required DateTime? tanggal, required String hint, required VoidCallback onTap}) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 15, vertical: 15),
+        decoration: BoxDecoration(
+          color: fieldPink.withOpacity(0.5),
+          borderRadius: BorderRadius.circular(15),
+        ),
+        child: Row(
+          children: [
+            Icon(Icons.calendar_month_rounded, color: navyDark.withOpacity(0.7)),
+            const SizedBox(width: 10),
+            Text(
+              tanggal == null 
+                  ? hint 
+                  : "${tanggal.day}/${tanggal.month}/${tanggal.year}",
+              style: TextStyle(
+                fontSize: 14, 
+                fontWeight: FontWeight.w500,
+                color: tanggal == null ? navyDark.withOpacity(0.4) : navyDark,
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }

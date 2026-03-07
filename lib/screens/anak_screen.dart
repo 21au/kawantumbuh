@@ -32,6 +32,21 @@ class _AnakScreenState extends State<AnakScreen> {
     _fetchDataAnak();
   }
 
+  // --- FUNGSI FORMAT TANGGAL KE BAHASA INDONESIA ---
+  String _formatTanggal(String? dateStr) {
+    if (dateStr == null || dateStr.isEmpty) return "Tanggal lahir belum diatur";
+    try {
+      DateTime date = DateTime.parse(dateStr);
+      List<String> bulan = [
+        '', 'Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni',
+        'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'
+      ];
+      return "${date.day} ${bulan[date.month]} ${date.year}";
+    } catch (e) {
+      return dateStr; // Jika gagal diparse, tampilkan data aslinya
+    }
+  }
+
   // --- LOGIKA AMBIL DATA ---
   Future<void> _fetchDataAnak() async {
     if (!mounted) return;
@@ -79,6 +94,115 @@ class _AnakScreenState extends State<AnakScreen> {
     } catch (e) {
       debugPrint("Error fetch riwayat: $e");
     }
+  }
+
+  // --- FUNGSI TAMPILKAN DETAIL ANAK (BOTTOM SHEET) ---
+  void _tampilkanDetailAnak(BuildContext context, Map<String, dynamic> dataAnak) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true, 
+      backgroundColor: Colors.transparent,
+      builder: (context) {
+        return Container(
+          height: MediaQuery.of(context).size.height * 0.75, 
+          padding: const EdgeInsets.all(24),
+          decoration: BoxDecoration(
+            color: softPink, // Menggunakan palet Bunda
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(30)),
+          ),
+          child: SingleChildScrollView(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // Indikator geser (Pull bar)
+                Center(
+                  child: Container(
+                    width: 50, height: 5,
+                    decoration: BoxDecoration(color: navyDark.withOpacity(0.3), borderRadius: BorderRadius.circular(10)),
+                  ),
+                ),
+                const SizedBox(height: 20),
+                Text(
+                  "Kartu Identitas Anak", 
+                  style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: navyDark)
+                ),
+                const SizedBox(height: 20),
+
+                // --- INFO ANAK ---
+                _buildInfoRow(Icons.child_care, "Nama Anak", dataAnak['nama'] ?? '-'),
+                _buildInfoRow(Icons.cake, "Tanggal Lahir", _formatTanggal(dataAnak['tanggal_lahir'])),
+                _buildInfoRow(Icons.location_on, "Tempat Lahir", dataAnak['tempat_lahir'] ?? '-'),
+                _buildInfoRow(Icons.bloodtype, "Golongan Darah", dataAnak['golongan_darah'] ?? 'Belum Tahu'),
+                
+                Divider(height: 30, thickness: 1, color: highlightPink), 
+
+                // --- INFO ORANG TUA ---
+                _buildInfoRow(Icons.favorite, "Nama Ibu", dataAnak['nama_ibu'] ?? '-'),
+                _buildInfoRow(Icons.person, "Nama Ayah", dataAnak['nama_ayah'] ?? '-'),
+                _buildInfoRow(Icons.phone, "Nomor Telepon", dataAnak['no_telp'] ?? '-'),
+                _buildInfoRow(Icons.home, "Alamat", dataAnak['alamat'] ?? '-'),
+
+                Divider(height: 30, thickness: 1, color: highlightPink),
+
+                // --- CATATAN ALERGI ---
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(15),
+                  decoration: BoxDecoration(
+                    color: fieldPink, 
+                    borderRadius: BorderRadius.circular(15),
+                    border: Border.all(color: highlightPink),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Icon(Icons.medical_information, color: navyDark, size: 20),
+                          const SizedBox(width: 8),
+                          Text("Catatan Alergi / Medis", style: TextStyle(fontWeight: FontWeight.bold, color: navyDark)),
+                        ],
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        (dataAnak['catatan_alergi'] == null || dataAnak['catatan_alergi'].toString().isEmpty) 
+                            ? 'Tidak ada catatan khusus.' 
+                            : dataAnak['catatan_alergi'],
+                        style: TextStyle(color: navyDark.withOpacity(0.8), fontSize: 14),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 30),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  // Widget Bantuan untuk Bottom Sheet
+  Widget _buildInfoRow(IconData icon, String label, String value) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 12),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(icon, size: 20, color: navyDark.withOpacity(0.7)),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(label, style: TextStyle(fontSize: 12, color: navyDark.withOpacity(0.6))),
+                Text(value, style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: navyDark)),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
   }
 
   @override
@@ -158,7 +282,14 @@ class _AnakScreenState extends State<AnakScreen> {
             _buildChildSelector(),
           ],
           const SizedBox(height: 25),
-          _buildMainCard(child),
+          
+          // ---> DIBUNGKUS GESTURE DETECTOR AGAR BISA DITEKAN <---
+          // FIX: Di sini sebelumnya terpanggil ikon edit dua kali.
+          // Sekarang memanggil _buildMainCard yang memang sudah Anda buat di bawah.
+          GestureDetector(
+            onTap: () => _tampilkanDetailAnak(context, child),
+            child: _buildMainCard(child),
+          ),
         ],
       ),
     );
@@ -200,6 +331,7 @@ class _AnakScreenState extends State<AnakScreen> {
 
   Widget _buildMainCard(Map<String, dynamic> child) {
     final String usiaAnak = child['usia']?.toString() ?? "0";
+    final String tanggalLahir = _formatTanggal(child['tanggal_lahir']);
 
     return Container(
       padding: const EdgeInsets.all(20),
@@ -225,7 +357,7 @@ class _AnakScreenState extends State<AnakScreen> {
                             fontSize: 20,
                             fontWeight: FontWeight.bold)),
                     const SizedBox(height: 4),
-                    Text("${child['jenis_kelamin'] ?? 'Perempuan'}, 21 Juli 2022",
+                    Text("${child['jenis_kelamin'] ?? '-'}, $tanggalLahir",
                         style: TextStyle(color: softPink.withOpacity(0.7), fontSize: 15)),
                   ],
                 ),
@@ -234,7 +366,7 @@ class _AnakScreenState extends State<AnakScreen> {
                 onTap: () => Navigator.push(
                     context,
                     MaterialPageRoute(
-                        builder: (context) => const EditDataAnakScreen())),
+                        builder: (context) => EditDataAnakScreen(dataAnak: child))),
                 child: Container(
                   padding: const EdgeInsets.all(8),
                   decoration: BoxDecoration(
@@ -268,13 +400,9 @@ class _AnakScreenState extends State<AnakScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(label,
-            style:
-                TextStyle(color: softPink, fontSize: 14)),
+        Text(label, style: TextStyle(color: softPink, fontSize: 14)),
         const SizedBox(height: 4),
-        Text(value,
-            style: TextStyle(
-                color: softPink, fontSize: 18, fontWeight: FontWeight.bold)),
+        Text(value, style: TextStyle(color: softPink, fontSize: 18, fontWeight: FontWeight.bold)),
       ],
     );
   }
@@ -312,7 +440,6 @@ class _AnakScreenState extends State<AnakScreen> {
     );
   }
 
-  // --- BAGIAN GRAFIK KIA YANG DIMINTA BUNDA ---
   Widget _buildFauxChartCard() {
     return Container(
       width: double.infinity,
@@ -610,22 +737,17 @@ class KIAChartPainter extends CustomPainter {
 
   @override
   void paint(Canvas canvas, Size size) {
-    // 1. MENGGAMBAR PITA WARNA BUKU KIA (ZONA PERTUMBUHAN)
     final paintZone = Paint()..style = PaintingStyle.fill;
 
-    // Zona Atas (Risiko Berlebih) - Kuning Lembut
     paintZone.color = const Color(0xFFFDE68A).withOpacity(0.6); 
     canvas.drawRect(Rect.fromLTRB(0, 0, size.width, size.height * 0.25), paintZone);
 
-    // Zona Tengah (Pita Hijau KMS / Normal) - Hijau Lembut
     paintZone.color = const Color(0xFFA5D6A7).withOpacity(0.6); 
     canvas.drawRect(Rect.fromLTRB(0, size.height * 0.25, size.width, size.height * 0.75), paintZone);
 
-    // Zona Bawah (Risiko Kurang) - Merah/Pink Pucat
     paintZone.color = const Color(0xFFFCA5A5).withOpacity(0.6); 
     canvas.drawRect(Rect.fromLTRB(0, size.height * 0.75, size.width, size.height), paintZone);
 
-    // Garis batas antar zona biar rapi
     final borderPaint = Paint()
       ..color = const Color(0xFF102C57).withOpacity(0.1)
       ..strokeWidth = 1
@@ -633,7 +755,6 @@ class KIAChartPainter extends CustomPainter {
     canvas.drawLine(Offset(0, size.height * 0.25), Offset(size.width, size.height * 0.25), borderPaint);
     canvas.drawLine(Offset(0, size.height * 0.75), Offset(size.width, size.height * 0.75), borderPaint);
 
-    // 2. MENGGAMBAR GARIS PREDIKSI
     final paintLine = Paint()
       ..color = lineColor
       ..strokeWidth = 3.5
@@ -642,7 +763,6 @@ class KIAChartPainter extends CustomPainter {
 
     final path = Path();
     
-    // Titik-titik simulasi grafik
     path.moveTo(0, size.height * 0.85); 
     path.lineTo(size.width * 0.25, size.height * 0.65); 
     path.lineTo(size.width * 0.5, size.height * 0.50); 
@@ -651,7 +771,6 @@ class KIAChartPainter extends CustomPainter {
 
     canvas.drawPath(path, paintLine);
 
-    // 3. MENGGAMBAR TITIK-TITIK PENGUKURAN/PREDIKSI
     final dotPaint = Paint()..color = lineColor..style = PaintingStyle.fill;
     canvas.drawCircle(Offset(0, size.height * 0.85), 5, dotPaint);
     canvas.drawCircle(Offset(size.width * 0.25, size.height * 0.65), 5, dotPaint);
