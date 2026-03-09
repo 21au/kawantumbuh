@@ -16,7 +16,7 @@ class DashboardScreen extends StatefulWidget {
 }
 
 class _DashboardScreenState extends State<DashboardScreen> {
-  // --- 4 PALET WARNA UTAMA BUNDA (100% TANPA HITAM) ---
+  // --- PALET WARNA UTAMA ---
   final Color navyDark = const Color(0xFF102C57);      
   final Color softPink = const Color(0xFFFFEAEA);      
   final Color fieldPink = const Color(0xFFF5CBCB);     
@@ -24,13 +24,22 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
   String _userName = "Bunda"; 
   bool _isLoadingName = true;
+  
+  // --- STATE UNTUK DATA ANAK ---
+  bool _isLoadingAnak = true;
+  List<Map<String, dynamic>> _daftarAnak = [];
+  int _selectedAnakIndex = 0;
+  String _beratBadan = "-";
+  String _tinggiBadan = "-";
 
   @override
   void initState() {
     super.initState();
     _fetchUserName();
+    _fetchDataAnak(); // Panggil fungsi ambil data anak saat layar dimuat
   }
 
+  // --- FUNGSI AMBIL NAMA BUNDA ---
   void _fetchUserName() {
     final user = Supabase.instance.client.auth.currentUser;
     if (user != null) {
@@ -42,11 +51,131 @@ class _DashboardScreenState extends State<DashboardScreen> {
     }
   }
 
+  // --- FUNGSI AMBIL DATA ANAK DARI SUPABASE ---
+  Future<void> _fetchDataAnak() async {
+    try {
+      final user = Supabase.instance.client.auth.currentUser;
+      if (user == null) return;
+
+      final dataAnak = await Supabase.instance.client
+          .from('anak')
+          .select()
+          .eq('user_id', user.id);
+
+      if (mounted) {
+        setState(() {
+          _daftarAnak = List<Map<String, dynamic>>.from(dataAnak);
+          _isLoadingAnak = false;
+        });
+
+        if (_daftarAnak.isNotEmpty) {
+          _fetchRiwayatTerakhir(_daftarAnak[_selectedAnakIndex]['id']);
+        }
+      }
+    } catch (e) {
+      debugPrint("Error fetch anak di dashboard: $e");
+      if (mounted) setState(() => _isLoadingAnak = false);
+    }
+  }
+
+  // --- FUNGSI AMBIL PENGUKURAN TERAKHIR ---
+  Future<void> _fetchRiwayatTerakhir(dynamic anakId) async {
+    try {
+      final dataRiwayat = await Supabase.instance.client
+          .from('pertumbuhan')
+          .select()
+          .eq('anak_id', anakId)
+          .order('tanggal_pengukuran', ascending: false)
+          .limit(1);
+
+      if (mounted) {
+        setState(() {
+          if (dataRiwayat.isNotEmpty) {
+            _beratBadan = "${dataRiwayat[0]['berat_badan']} kg";
+            _tinggiBadan = "${dataRiwayat[0]['tinggi_badan']} cm";
+          } else {
+            _beratBadan = "- kg";
+            _tinggiBadan = "- cm";
+          }
+        });
+      }
+    } catch (e) {
+      debugPrint("Error fetch riwayat terakhir: $e");
+    }
+  }
+
+  // --- FUNGSI HITUNG UMUR (BULAN) ---
+  String _hitungUsia(String? tglLahir) {
+    if (tglLahir == null) return "- bulan";
+    try {
+      final birthDate = DateTime.parse(tglLahir);
+      final today = DateTime.now();
+      int months = (today.year - birthDate.year) * 12 + today.month - birthDate.month;
+      if (today.day < birthDate.day) months--;
+      return "$months bulan";
+    } catch (e) {
+      return "- bulan";
+    }
+  }
+
   String _getFormattedDate() {
     final now = DateTime.now();
     final months = ['', 'Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni', 'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'];
     final days = ['', 'Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu', 'Minggu'];
     return "${days[now.weekday]}, ${now.day} ${months[now.month]} ${now.year}";
+  }
+
+  // --- FUNGSI MUNCULKAN DROPDOWN PILIH ANAK ---
+  void _tampilkanPilihAnak() {
+    if (_daftarAnak.isEmpty) return;
+
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      builder: (context) {
+        return Container(
+          padding: const EdgeInsets.all(24),
+          decoration: BoxDecoration(
+            color: softPink,
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(30)),
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                width: 50, height: 5,
+                decoration: BoxDecoration(color: navyDark.withOpacity(0.3), borderRadius: BorderRadius.circular(10)),
+              ),
+              const SizedBox(height: 20),
+              Text("Pilih Anak", style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: navyDark)),
+              const SizedBox(height: 20),
+              ...List.generate(_daftarAnak.length, (index) {
+                final anak = _daftarAnak[index];
+                final isSelected = index == _selectedAnakIndex;
+                return ListTile(
+                  leading: CircleAvatar(
+                    backgroundColor: isSelected ? navyDark : highlightPink,
+                    child: Icon(Icons.child_care, color: softPink),
+                  ),
+                  title: Text(anak['nama'] ?? "Anak", style: TextStyle(color: navyDark, fontWeight: FontWeight.bold)),
+                  trailing: isSelected ? Icon(Icons.check_circle, color: navyDark) : null,
+                  onTap: () {
+                    setState(() {
+                      _selectedAnakIndex = index;
+                      _beratBadan = "-"; // Reset sementara saat loading
+                      _tinggiBadan = "-";
+                    });
+                    _fetchRiwayatTerakhir(anak['id']);
+                    Navigator.pop(context); // Tutup bottom sheet
+                  },
+                );
+              }),
+              const SizedBox(height: 20),
+            ],
+          ),
+        );
+      },
+    );
   }
 
   @override
@@ -108,37 +237,81 @@ class _DashboardScreenState extends State<DashboardScreen> {
           ),
           const SizedBox(height: 30),
           
-          GestureDetector(
-            onTap: () => Navigator.push(context, MaterialPageRoute(builder: (context) => const AnakScreen())),
-            child: Container(
-              padding: const EdgeInsets.all(18),
-              decoration: BoxDecoration(
-                color: softPink.withOpacity(0.50), 
-                borderRadius: BorderRadius.circular(25),
+          // KARTU ANAK (DIBUAT DINAMIS)
+          _buildKartuAnakDashboard(),
+        ],
+      ),
+    );
+  }
+
+  // --- WIDGET KARTU ANAK ---
+  Widget _buildKartuAnakDashboard() {
+    if (_isLoadingAnak) {
+      return Container(
+        padding: const EdgeInsets.all(18),
+        decoration: BoxDecoration(color: softPink.withOpacity(0.50), borderRadius: BorderRadius.circular(25)),
+        child: const Center(child: CircularProgressIndicator(color: Colors.white)),
+      );
+    }
+
+    if (_daftarAnak.isEmpty) {
+      return GestureDetector(
+        onTap: () => Navigator.push(context, MaterialPageRoute(builder: (context) => const AnakScreen())),
+        child: Container(
+          padding: const EdgeInsets.all(18),
+          decoration: BoxDecoration(color: softPink.withOpacity(0.50), borderRadius: BorderRadius.circular(25)),
+          child: Row(
+            children: [
+              CircleAvatar(backgroundColor: highlightPink, radius: 28, child: Icon(Icons.add, color: softPink, size: 32)),
+              const SizedBox(width: 15),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text("Belum ada data anak", style: TextStyle(color: softPink, fontSize: 16, fontWeight: FontWeight.bold)),
+                    Text("Ketuk untuk menambahkan", style: TextStyle(color: softPink, fontSize: 12)),
+                  ],
+                ),
               ),
-              child: Row(
+            ],
+          ),
+        ),
+      );
+    }
+
+    // Jika ada data anak
+    final anakAktif = _daftarAnak[_selectedAnakIndex];
+    final umurBulan = _hitungUsia(anakAktif['tanggal_lahir']);
+
+    return GestureDetector(
+      onTap: _tampilkanPilihAnak, // Klik kartu memunculkan pilihan anak
+      child: Container(
+        padding: const EdgeInsets.all(18),
+        decoration: BoxDecoration(
+          color: softPink.withOpacity(0.50), 
+          borderRadius: BorderRadius.circular(25),
+        ),
+        child: Row(
+          children: [
+            CircleAvatar(
+              backgroundColor: highlightPink,
+              radius: 28,
+              child: Icon(Icons.child_care, color: softPink, size: 32),
+            ),
+            const SizedBox(width: 15),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  CircleAvatar(
-                    backgroundColor: highlightPink,
-                    radius: 28,
-                    child: Icon(Icons.child_care, color: softPink, size: 32),
-                  ),
-                  const SizedBox(width: 15),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text("Fatimah Azzahra", style: TextStyle(color: softPink, fontSize: 18, fontWeight: FontWeight.bold)),
-                        Text("18 bulan · 10 kg · 80 cm", style: TextStyle(color: softPink, fontSize: 13, fontWeight: FontWeight.w500)),
-                      ],
-                    ),
-                  ),
-                  Icon(Icons.arrow_forward_ios_rounded, color: softPink, size: 20),
+                  Text(anakAktif['nama'] ?? "Nama Anak", style: TextStyle(color: softPink, fontSize: 18, fontWeight: FontWeight.bold)),
+                  Text("$umurBulan · $_beratBadan · $_tinggiBadan", style: TextStyle(color: softPink, fontSize: 13, fontWeight: FontWeight.w500)),
                 ],
               ),
             ),
-          ),
-        ],
+            // Ikon diubah jadi panah bawah menandakan bisa diganti (dropdown)
+            Icon(Icons.keyboard_arrow_down_rounded, color: softPink, size: 28),
+          ],
+        ),
       ),
     );
   }
@@ -158,15 +331,37 @@ class _DashboardScreenState extends State<DashboardScreen> {
     );
   }
 
+  // --- FUNGSI KLIK MENU (YANG SUDAH DIPERBARUI) ---
   Widget _buildMenuCard(IconData icon, String title, String subtitle) {
     double width = (MediaQuery.of(context).size.width - 70) / 3;
     return GestureDetector(
       onTap: () {
-        // Pindah tab via Wrapper kalau Tips dipencet
         if (title == "Tips Sehat") {
           widget.onNavigateToTips();
         } else if (title == "Pertumbuhan") {
-          Navigator.push(context, MaterialPageRoute(builder: (context) => const StatistikPertumbuhanScreen()));
+          // Cek apakah data anak kosong
+          if (_daftarAnak.isEmpty) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text("Silakan tambah data anak terlebih dahulu", style: TextStyle(color: softPink)), 
+                backgroundColor: navyDark
+              ),
+            );
+            return;
+          }
+          
+          // Ambil data anak yang sedang dipilih di dropdown atas
+          final anakAktif = _daftarAnak[_selectedAnakIndex];
+          
+          // Pindah ke layar Statistik dan Bawa ID serta Nama Anak
+          Navigator.push(context, MaterialPageRoute(
+            builder: (context) => StatistikPertumbuhanScreen(
+              anakId: anakAktif['id'].toString(),
+              namaAnak: anakAktif['nama'] ?? 'Si Kecil',
+            )
+          ));
+        } else if (title == "Jadwal") {
+             // Nanti logika untuk Jadwal ditaruh di sini
         }
       },
       child: Container(
@@ -202,7 +397,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
             children: [
               Text("Tips Kesehatan", style: TextStyle(color: navyDark, fontSize: 18, fontWeight: FontWeight.bold)),
               GestureDetector(
-                onTap: widget.onNavigateToTips, // Langsung panggil fungsi navigasi tab
+                onTap: widget.onNavigateToTips, 
                 child: Text("Lihat Semua", style: TextStyle(color: navyDark.withOpacity(0.6), fontSize: 13, fontWeight: FontWeight.bold)),
               ),
             ],
