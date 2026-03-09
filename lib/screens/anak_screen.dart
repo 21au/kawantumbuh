@@ -13,6 +13,7 @@ class AnakScreen extends StatefulWidget {
 }
 
 class _AnakScreenState extends State<AnakScreen> {
+  // Color Palette
   final Color navyDark = const Color(0xFF102C57);
   final Color softPink = const Color(0xFFFFEAEA); 
   final Color fieldPink = const Color(0xFFF5CBCB); 
@@ -26,7 +27,7 @@ class _AnakScreenState extends State<AnakScreen> {
   
   List<Map<String, dynamic>> _daftarAnak = [];
   List<Map<String, dynamic>> _riwayatPertumbuhan = [];
-  Map<String, dynamic>? _prediksiTerbaru; // Menyimpan data hasil Python
+  Map<String, dynamic>? _prediksiTerbaru; 
 
   @override
   void initState() {
@@ -52,7 +53,10 @@ class _AnakScreenState extends State<AnakScreen> {
       final user = Supabase.instance.client.auth.currentUser;
       if (user == null) return;
 
-      final dataAnak = await Supabase.instance.client.from('anak').select().eq('user_id', user.id);
+      final dataAnak = await Supabase.instance.client
+          .from('anak')
+          .select()
+          .eq('user_id', user.id);
 
       if (mounted) {
         setState(() {
@@ -60,6 +64,7 @@ class _AnakScreenState extends State<AnakScreen> {
         });
 
         if (_daftarAnak.isNotEmpty) {
+          if (selectedIndex >= _daftarAnak.length) selectedIndex = 0;
           await _fetchRiwayat(selectedIndex);
         } else {
            setState(() => _isLoading = false);
@@ -75,14 +80,12 @@ class _AnakScreenState extends State<AnakScreen> {
     try {
       final childId = _daftarAnak[index]['id'];
 
-      // Ambil Riwayat
       final dataRiwayat = await Supabase.instance.client
           .from('pertumbuhan')
           .select()
           .eq('anak_id', childId)
           .order('tanggal_pengukuran', ascending: false);
 
-      // Ambil Hasil Prediksi Python
       final dataPrediksi = await Supabase.instance.client
           .from('prediksi_pertumbuhan')
           .select()
@@ -103,77 +106,15 @@ class _AnakScreenState extends State<AnakScreen> {
     }
   }
 
-  // --- MENGAMBIL DATA UNTUK GRAFIK AGAR DINAMIS ---
   List<double> _getChartData() {
     if (_riwayatPertumbuhan.isEmpty) return [];
-    
-    // Ambil maksimal 5 data tertua ke terbaru untuk di-plot dari kiri ke kanan
     var recentData = _riwayatPertumbuhan.take(5).toList();
     recentData = recentData.reversed.toList(); 
 
     return recentData.map((e) {
-      // Mengambil berat badan atau tinggi badan tergantung Toggle
       var val = isBeratBadan ? e['berat_badan'] : e['tinggi_badan'];
       return double.tryParse(val.toString()) ?? 0.0;
     }).toList();
-  }
-
-  // --- TAMPILKAN BOTTOM SHEET (SAMA SEPERTI SEBELUMNYA) ---
-  void _tampilkanDetailAnak(BuildContext context, Map<String, dynamic> dataAnak) {
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true, 
-      backgroundColor: Colors.transparent,
-      builder: (context) {
-        return Container(
-          height: MediaQuery.of(context).size.height * 0.75, 
-          padding: const EdgeInsets.all(24),
-          decoration: BoxDecoration(color: softPink, borderRadius: const BorderRadius.vertical(top: Radius.circular(30))),
-          child: SingleChildScrollView(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Center(child: Container(width: 50, height: 5, decoration: BoxDecoration(color: navyDark.withOpacity(0.3), borderRadius: BorderRadius.circular(10)))),
-                const SizedBox(height: 20),
-                Text("Kartu Identitas Anak", style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: navyDark)),
-                const SizedBox(height: 20),
-                _buildInfoRow(Icons.child_care, "Nama Anak", dataAnak['nama'] ?? '-'),
-                _buildInfoRow(Icons.cake, "Tanggal Lahir", _formatTanggal(dataAnak['tanggal_lahir'])),
-                _buildInfoRow(Icons.location_on, "Tempat Lahir", dataAnak['tempat_lahir'] ?? '-'),
-                _buildInfoRow(Icons.bloodtype, "Golongan Darah", dataAnak['golongan_darah'] ?? 'Belum Tahu'),
-                Divider(height: 30, thickness: 1, color: highlightPink), 
-                _buildInfoRow(Icons.favorite, "Nama Ibu", dataAnak['nama_ibu'] ?? '-'),
-                _buildInfoRow(Icons.person, "Nama Ayah", dataAnak['nama_ayah'] ?? '-'),
-                _buildInfoRow(Icons.phone, "Nomor Telepon", dataAnak['no_telp'] ?? '-'),
-                _buildInfoRow(Icons.home, "Alamat", dataAnak['alamat'] ?? '-'),
-              ],
-            ),
-          ),
-        );
-      },
-    );
-  }
-
-  Widget _buildInfoRow(IconData icon, String label, String value) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 12),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Icon(icon, size: 20, color: navyDark.withOpacity(0.7)),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(label, style: TextStyle(fontSize: 12, color: navyDark.withOpacity(0.6))),
-                Text(value, style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: navyDark)),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
   }
 
   @override
@@ -181,7 +122,8 @@ class _AnakScreenState extends State<AnakScreen> {
     if (_isLoading) {
       return Scaffold(backgroundColor: softPink, body: Center(child: CircularProgressIndicator(color: navyDark)));
     }
-    if (_daftarAnak.isEmpty) {
+    
+    if (_daftarAnak.isEmpty || selectedIndex >= _daftarAnak.length) {
       return Scaffold(backgroundColor: softPink, body: _buildEmptyState());
     }
 
@@ -224,6 +166,99 @@ class _AnakScreenState extends State<AnakScreen> {
     );
   }
 
+  // --- WIDGET ANALISIS SISTEM (DIPERBAIKI) ---
+  Widget _buildStatusPertumbuhan(String name) {
+    String rawStatus = _prediksiTerbaru?['status_gizi'] ?? "";
+    bool isInvalid = rawStatus.isEmpty || rawStatus.contains("TIDAK DAPAT DIHITUNG");
+
+    String pesan = isInvalid 
+        ? "Data belum cukup untuk dianalisis. Yuk, rutin catat pertumbuhan si kecil setiap bulan!"
+        : "Berdasarkan data terbaru, status gizi $name saat ini adalah $rawStatus.";
+    
+    Color boxColor = fieldPink;
+    if (!isInvalid) {
+      if (rawStatus.toLowerCase().contains("normal") || rawStatus.toLowerCase().contains("baik")) {
+        boxColor = successGreen;
+        pesan += " Terus jaga asupan gizinya ya bun!";
+      } else {
+        boxColor = Colors.orangeAccent.withOpacity(0.7);
+        pesan += " Sebaiknya konsultasikan dengan tenaga kesehatan.";
+      }
+    }
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(color: boxColor, borderRadius: BorderRadius.circular(15)),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(children: [
+            Icon(Icons.analytics_outlined, color: navyDark, size: 22),
+            const SizedBox(width: 10),
+            Text("Analisis Sistem", style: TextStyle(color: navyDark, fontWeight: FontWeight.bold, fontSize: 16))
+          ]),
+          const SizedBox(height: 10),
+          Text(pesan, style: TextStyle(color: navyDark.withOpacity(0.9), fontSize: 13, height: 1.4)),
+        ],
+      ),
+    );
+  }
+
+  // --- WIDGET PREDIKSI GIZI (SOLUSI OVERFLOW) ---
+  Widget _buildPrediksiGizi() {
+    String status = _prediksiTerbaru?['status_gizi'] ?? "Menunggu Data";
+
+    return Container(
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(color: fieldPink, borderRadius: BorderRadius.circular(20)),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(Icons.monitor_heart, color: brightPink, size: 28),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text("Prediksi Status Gizi", style: TextStyle(color: navyDark, fontWeight: FontWeight.bold, fontSize: 16)),
+                    Text("Berdasarkan perhitungan Z-Score AI", style: TextStyle(color: navyDark.withOpacity(0.5), fontSize: 11)),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 20),
+          Container(
+            padding: const EdgeInsets.all(15),
+            decoration: BoxDecoration(color: softPink, borderRadius: BorderRadius.circular(15)),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text("Status Gizi:", style: TextStyle(fontWeight: FontWeight.bold, color: navyDark)),
+                const SizedBox(width: 8),
+                Flexible(
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                    decoration: BoxDecoration(color: navyDark, borderRadius: BorderRadius.circular(10)),
+                    child: Text(
+                      status.toUpperCase(), 
+                      textAlign: TextAlign.center,
+                      style: TextStyle(color: softPink, fontSize: 10, fontWeight: FontWeight.bold),
+                    ),
+                  ),
+                )
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // --- SISA WIDGET PENDUKUNG ---
   Widget _buildHeader(Map<String, dynamic> child) {
     return Container(
       width: double.infinity,
@@ -242,10 +277,7 @@ class _AnakScreenState extends State<AnakScreen> {
             _buildChildSelector(),
           ],
           const SizedBox(height: 25),
-          GestureDetector(
-            onTap: () => _tampilkanDetailAnak(context, child),
-            child: _buildMainCard(child),
-          ),
+          _buildMainCard(child),
         ],
       ),
     );
@@ -377,118 +409,63 @@ class _AnakScreenState extends State<AnakScreen> {
     );
   }
 
-  // --- GRAFIK SEKARANG DINAMIS ---
   Widget _buildDynamicChartCard() {
     List<double> chartData = _getChartData();
 
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(color: softPink, borderRadius: BorderRadius.circular(20), boxShadow: [BoxShadow(color: navyDark.withOpacity(0.15), blurRadius: 15, offset: const Offset(0, 8))]),
+      decoration: BoxDecoration(
+        color: Colors.white, 
+        borderRadius: BorderRadius.circular(20), 
+        boxShadow: [BoxShadow(color: navyDark.withOpacity(0.1), blurRadius: 15, offset: const Offset(0, 8))]
+      ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(isBeratBadan ? "Kurva Berat Badan" : "Kurva Tinggi Badan", style: TextStyle(color: navyDark, fontWeight: FontWeight.bold, fontSize: 16)),
-          const SizedBox(height: 8),
-          Text("↑ Sumbu Y: ${isBeratBadan ? 'Nilai Berat (kg)' : 'Nilai Tinggi (cm)'}", style: TextStyle(color: navyDark.withOpacity(0.6), fontSize: 10, fontWeight: FontWeight.w600)),
+          const SizedBox(height: 5),
+          Text("Standar Pertumbuhan Kemenkes (KIA)", style: TextStyle(color: navyDark.withOpacity(0.5), fontSize: 11)),
           const SizedBox(height: 15),
           SizedBox(
-            height: 180,
-            child: Row(
-              children: [
-                Expanded(
-                  child: Container(
-                    decoration: BoxDecoration(
-                      border: Border(left: BorderSide(color: navyDark.withOpacity(0.3), width: 2), bottom: BorderSide(color: navyDark.withOpacity(0.3), width: 2)),
-                    ),
-                    child: CustomPaint(
-                      size: Size.infinite,
-                      painter: DynamicChartPainter(navyDark, chartData),
-                    ),
-                  ),
-                ),
-              ],
+            height: 200,
+            child: CustomPaint(
+              size: Size.infinite,
+              painter: DynamicChartPainter(navyDark, chartData, isBeratBadan),
             ),
-          ),
-          const SizedBox(height: 10),
-          Center(child: Text("Sumbu X: Riwayat 5 Pengukuran Terakhir →", style: TextStyle(color: navyDark.withOpacity(0.6), fontSize: 10, fontWeight: FontWeight.w600))),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildStatusPertumbuhan(String name) {
-    // Ambil status gizi dari Python, jika belum ada kasih default
-    String status = _prediksiTerbaru?['status_gizi'] ?? "Belum dianalisis";
-    String pesan = "Data pertumbuhan belum cukup untuk dianalisis oleh sistem.";
-    
-    Color boxColor = fieldPink;
-    if (status.toLowerCase().contains("normal") || status.toLowerCase().contains("baik")) {
-      boxColor = successGreen;
-      pesan = "Pertumbuhan si kecil baik dan sesuai dengan kurva WHO. Terus jaga asupan gizinya ya bun!";
-    } else if (status != "Belum dianalisis") {
-      boxColor = Colors.orangeAccent.withOpacity(0.7);
-      pesan = "Perhatian bun, ada indikasi $status. Yuk konsultasi dengan tenaga kesehatan.";
-    }
-
-    return Container(
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(color: boxColor, borderRadius: BorderRadius.circular(15)),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(children: [
-            Icon(Icons.analytics_outlined, color: navyDark, size: 22),
-            const SizedBox(width: 10),
-            Text("Analisis Sistem", style: TextStyle(color: navyDark, fontWeight: FontWeight.bold, fontSize: 16))
-          ]),
-          const SizedBox(height: 10),
-          Text(pesan, style: TextStyle(color: navyDark.withOpacity(0.9), fontSize: 13, height: 1.4)),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildPrediksiGizi() {
-    String status = _prediksiTerbaru?['status_gizi'] ?? "Menunggu Data";
-
-    return Container(
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(color: fieldPink, borderRadius: BorderRadius.circular(20)),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Icon(Icons.monitor_heart, color: brightPink, size: 28),
-              const SizedBox(width: 10),
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text("Prediksi Status Gizi", style: TextStyle(color: navyDark, fontWeight: FontWeight.bold, fontSize: 16)),
-                  Text("Berdasarkan perhitungan Z-Score AI", style: TextStyle(color: navyDark.withOpacity(0.5), fontSize: 11)),
-                ],
-              ),
-            ],
           ),
           const SizedBox(height: 20),
-          Container(
-            padding: const EdgeInsets.all(15),
-            decoration: BoxDecoration(color: softPink, borderRadius: BorderRadius.circular(15)),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Text("Status Gizi (BB/U):", style: TextStyle(fontWeight: FontWeight.bold, color: navyDark)),
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                  decoration: BoxDecoration(color: navyDark, borderRadius: BorderRadius.circular(10)),
-                  child: Text(status.toUpperCase(), style: TextStyle(color: softPink, fontSize: 12, fontWeight: FontWeight.bold)),
-                )
-              ],
-            ),
+          const Divider(),
+          const SizedBox(height: 10),
+          Text("Panduan Warna Grafik:", style: TextStyle(color: navyDark, fontWeight: FontWeight.bold, fontSize: 12)),
+          const SizedBox(height: 8),
+          Row(
+            children: [
+              _buildLegendItem(const Color(0xFF4CAF50), "Hijau: Normal"),
+              const SizedBox(width: 15),
+              _buildLegendItem(const Color(0xFFFFEB3B), "Kuning: Waspada"),
+            ],
+          ),
+          const SizedBox(height: 5),
+          Row(
+            children: [
+              _buildLegendItem(const Color(0xFFF44336), "Merah: Konsultasi"),
+              const SizedBox(width: 15),
+              _buildLegendItem(navyDark, "Titik: Data Anak"),
+            ],
           ),
         ],
       ),
+    );
+  }
+
+  Widget _buildLegendItem(Color color, String label) {
+    return Row(
+      children: [
+        Container(width: 12, height: 12, decoration: BoxDecoration(color: color, shape: BoxShape.circle)),
+        const SizedBox(width: 6),
+        Text(label, style: TextStyle(fontSize: 11, color: navyDark.withOpacity(0.7))),
+      ],
     );
   }
 
@@ -499,12 +476,11 @@ class _AnakScreenState extends State<AnakScreen> {
         Text("Riwayat Pengukuran", style: TextStyle(color: navyDark, fontSize: 18, fontWeight: FontWeight.bold)),
         ElevatedButton.icon(
           onPressed: () async {
-            // MENGIRIM ID ANAK KE SCREEN PENCATATAN
             final result = await Navigator.push(
               context,
               MaterialPageRoute(builder: (context) => CatatPertumbuhanScreen(anakId: anakId))
             );
-            if (result == true) _fetchDataAnak(); // Refresh jika ada data baru
+            if (result == true) _fetchDataAnak(); 
           },
           icon: Icon(Icons.add, size: 16, color: softPink),
           label: Text("Catat", style: TextStyle(color: softPink, fontWeight: FontWeight.bold)),
@@ -530,7 +506,7 @@ class _AnakScreenState extends State<AnakScreen> {
     return Container(
       margin: const EdgeInsets.only(bottom: 10),
       padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(color: fieldPink, borderRadius: BorderRadius.circular(15), boxShadow: [BoxShadow(color: navyDark.withOpacity(0.05), blurRadius: 5, offset: const Offset(0, 3))]),
+      decoration: BoxDecoration(color: fieldPink, borderRadius: BorderRadius.circular(15)),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
@@ -551,97 +527,80 @@ class _AnakScreenState extends State<AnakScreen> {
 
   Widget _buildEmptyState() {
     return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(30.0),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(Icons.child_friendly_rounded, size: 100, color: navyDark.withOpacity(0.3)),
-            const SizedBox(height: 20),
-            Text("Belum Ada Data Anak", style: TextStyle(color: navyDark, fontSize: 20, fontWeight: FontWeight.bold)),
-            const SizedBox(height: 10),
-            Text("Yuk, tambahkan data si kecil untuk mulai memantau tumbuh kembangnya.", textAlign: TextAlign.center, style: TextStyle(color: navyDark.withOpacity(0.7))),
-            const SizedBox(height: 30),
-            ElevatedButton(
-              onPressed: () async {
-                await Navigator.push(context, MaterialPageRoute(builder: (context) => const DaftarAnakScreen()));
-                _fetchDataAnak();
-              },
-              style: ElevatedButton.styleFrom(backgroundColor: navyDark, padding: const EdgeInsets.symmetric(horizontal: 40, vertical: 15), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15))),
-              child: Text("Tambah Data Anak", style: TextStyle(color: softPink, fontWeight: FontWeight.bold)),
-            ),
-          ],
-        ),
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(Icons.child_friendly, size: 80, color: navyDark.withOpacity(0.3)),
+          const SizedBox(height: 20),
+          Text("Belum Ada Data Anak", style: TextStyle(color: navyDark, fontWeight: FontWeight.bold)),
+          const SizedBox(height: 20),
+          ElevatedButton(
+            onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (context) => const DaftarAnakScreen())),
+            child: const Text("Tambah Data"),
+          )
+        ],
       ),
     );
   }
 }
 
-// --- CLASS CUSTOM PAINT UNTUK GRAFIK (SEKARANG BACA DATA ASLI!) ---
 class DynamicChartPainter extends CustomPainter {
   final Color lineColor;
   final List<double> dataPoints;
+  final bool isBerat;
 
-  DynamicChartPainter(this.lineColor, this.dataPoints);
+  DynamicChartPainter(this.lineColor, this.dataPoints, this.isBerat);
 
   @override
   void paint(Canvas canvas, Size size) {
-    final paintZone = Paint()..style = PaintingStyle.fill;
-    
-    // Warna Background Zona KIA (Hanya estetika)
-    paintZone.color = const Color(0xFFFDE68A).withOpacity(0.4); 
-    canvas.drawRect(Rect.fromLTRB(0, 0, size.width, size.height * 0.25), paintZone);
-    paintZone.color = const Color(0xFFA5D6A7).withOpacity(0.4); 
-    canvas.drawRect(Rect.fromLTRB(0, size.height * 0.25, size.width, size.height * 0.75), paintZone);
-    paintZone.color = const Color(0xFFFCA5A5).withOpacity(0.4); 
-    canvas.drawRect(Rect.fromLTRB(0, size.height * 0.75, size.width, size.height), paintZone);
+    final double w = size.width;
+    final double h = size.height;
 
-    if (dataPoints.isEmpty) return; // Jika tidak ada data, jangan gambar garis
+    _drawCurvedZone(canvas, size, const Color(0xFFFFEB3B).withOpacity(0.2), 0.1, 0.3); 
+    _drawCurvedZone(canvas, size, const Color(0xFF4CAF50).withOpacity(0.3), 0.3, 0.7); 
+    _drawCurvedZone(canvas, size, const Color(0xFFFFEB3B).withOpacity(0.2), 0.7, 0.85); 
+    _drawCurvedZone(canvas, size, const Color(0xFFF44336).withOpacity(0.2), 0.85, 1.0); 
 
-    // Mencari nilai Min dan Max untuk menyesuaikan garis agar pas di kotak
-    double maxVal = dataPoints.reduce(max);
-    double minVal = dataPoints.reduce(min);
-    
-    // Jika datanya datar (cuma 1 data atau angkanya sama semua), kasih margin buatan
-    if (maxVal == minVal) {
-      maxVal += 5;
-      minVal = (minVal - 5).clamp(0, double.infinity); 
-    } else {
-      maxVal += (maxVal - minVal) * 0.2; // Tambah ruang 20% di atas
-      minVal -= (maxVal - minVal) * 0.2; // Tambah ruang 20% di bawah
-    }
+    if (dataPoints.isEmpty) return;
+
+    double maxVal = dataPoints.reduce(max) + (isBerat ? 4 : 15);
+    double minVal = (dataPoints.reduce(min) - (isBerat ? 4 : 15)).clamp(0, double.infinity);
 
     final paintLine = Paint()
       ..color = lineColor
-      ..strokeWidth = 3.0
+      ..strokeWidth = 3.5
       ..strokeCap = StrokeCap.round
       ..style = PaintingStyle.stroke;
 
     final dotPaint = Paint()..color = lineColor..style = PaintingStyle.fill;
+    final dotOutline = Paint()..color = Colors.white..style = PaintingStyle.fill;
 
     final path = Path();
-    
-    // Lebar antar titik di sumbu X
-    double xStep = dataPoints.length > 1 ? size.width / (dataPoints.length - 1) : size.width / 2;
+    double xStep = dataPoints.length > 1 ? w / (dataPoints.length - 1) : w / 2;
 
     for (int i = 0; i < dataPoints.length; i++) {
-      // Posisi X (Kiri ke Kanan)
-      double x = dataPoints.length > 1 ? i * xStep : xStep;
-      
-      // Posisi Y (Bawah ke Atas, dinormalisasi dengan min/max)
+      double x = dataPoints.length > 1 ? i * xStep : w / 2;
       double normalizedY = (dataPoints[i] - minVal) / (maxVal - minVal);
-      double y = size.height - (normalizedY * size.height); // Balik karena 0,0 di kiri atas
+      double y = h - (normalizedY * h);
 
-      if (i == 0) {
-        path.moveTo(x, y);
-      } else {
-        path.lineTo(x, y);
-      }
-      canvas.drawCircle(Offset(x, y), 5, dotPaint);
+      if (i == 0) path.moveTo(x, y); else path.lineTo(x, y);
+      canvas.drawCircle(Offset(x, y), 6, dotOutline);
+      canvas.drawCircle(Offset(x, y), 4, dotPaint);
     }
     canvas.drawPath(path, paintLine);
   }
 
+  void _drawCurvedZone(Canvas canvas, Size size, Color color, double top, double bottom) {
+    final paint = Paint()..color = color..style = PaintingStyle.fill;
+    final path = Path();
+    path.moveTo(0, size.height * bottom);
+    path.quadraticBezierTo(size.width * 0.5, size.height * (bottom - 0.1), size.width, size.height * (bottom - 0.2));
+    path.lineTo(size.width, size.height * (top - 0.2));
+    path.quadraticBezierTo(size.width * 0.5, size.height * (top - 0.1), 0, size.height * top);
+    path.close();
+    canvas.drawPath(path, paint);
+  }
+
   @override
-  bool shouldRepaint(covariant DynamicChartPainter oldDelegate) => true; // Selalu gambar ulang kalau data berubah
+  bool shouldRepaint(covariant DynamicChartPainter oldDelegate) => true;
 }
