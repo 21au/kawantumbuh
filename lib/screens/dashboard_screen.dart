@@ -1,9 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
-import 'package:kawantumbuh/screens/statistik_pertumbuhan_screen.dart';
+import 'package:kawantumbuh/screens/statistik_pertumbuhan_screen.dart'; // Sesuaikan path jika beda
 import 'anak_screen.dart'; 
 import 'tips_screen.dart'; 
 import 'detail_tips_screen.dart'; 
+import 'jadwal_posyandu_screen.dart'; // <-- IMPORT HALAMAN JADWAL BARU DI SINI
 
 class DashboardScreen extends StatefulWidget {
   // Callback untuk memberitahu Wrapper agar pindah ke Tab Tips
@@ -361,7 +362,27 @@ class _DashboardScreenState extends State<DashboardScreen> {
             )
           ));
         } else if (title == "Jadwal") {
-             // Nanti logika untuk Jadwal ditaruh di sini
+          // 1. Cek apakah data anak kosong
+          if (_daftarAnak.isEmpty) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text("Silakan tambah data anak terlebih dahulu", style: TextStyle(color: softPink)), 
+                backgroundColor: navyDark
+              ),
+            );
+            return;
+          }
+          
+          // 2. Ambil data anak yang sedang dipilih di dropdown atas
+          final anakAktif = _daftarAnak[_selectedAnakIndex];
+          
+          // 3. Pindah ke layar Jadwal dan Bawa ID serta Nama Anak
+          Navigator.push(context, MaterialPageRoute(
+            builder: (context) => JadwalPosyanduScreen(
+              anakId: anakAktif['id'].toString(),
+              namaAnak: anakAktif['nama'] ?? 'Si Kecil',
+            )
+          ));
         }
       },
       child: Container(

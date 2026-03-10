@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'dart:math'; // Tambahan untuk menghitung nilai max/min di grafik
 
 class StatistikPertumbuhanScreen extends StatefulWidget {
   final String anakId;
@@ -21,11 +22,11 @@ class _StatistikPertumbuhanScreenState extends State<StatistikPertumbuhanScreen>
   final Color softPink = const Color(0xFFFFEAEA);
   final Color fieldPink = const Color(0xFFF5CBCB);
   final Color highlightPink = const Color(0xFFEBA9A9);
-  final Color brightPink = Colors.pinkAccent; // Tambahan sedikit warna cerah untuk AI
+  final Color brightPink = Colors.pinkAccent;
 
   bool _isLoading = true;
   List<Map<String, dynamic>> _riwayat = [];
-  List<Map<String, dynamic>> _listPrediksi = []; // Menyimpan data prediksi AI
+  List<Map<String, dynamic>> _listPrediksi = []; 
   
   String _kesimpulan = "";
   String _jenisKesimpulan = "Normal";
@@ -38,20 +39,18 @@ class _StatistikPertumbuhanScreenState extends State<StatistikPertumbuhanScreen>
 
   Future<void> _fetchRiwayatPertumbuhan() async {
     try {
-      // 1. Ambil data urut dari yang terlama ke terbaru (untuk grafik)
       final data = await Supabase.instance.client
           .from('pertumbuhan')
           .select()
           .eq('anak_id', widget.anakId)
           .order('tanggal_pengukuran', ascending: true);
 
-      // 2. Ambil data Prediksi dari Python
       final dataPrediksi = await Supabase.instance.client
           .from('prediksi_pertumbuhan')
           .select()
           .eq('anak_id', widget.anakId)
           .order('tanggal_prediksi', ascending: false)
-          .limit(10); // Ambil beberapa metrik terakhir
+          .limit(10); 
 
       if (mounted) {
         setState(() {
@@ -67,7 +66,6 @@ class _StatistikPertumbuhanScreenState extends State<StatistikPertumbuhanScreen>
     }
   }
 
-  // --- LOGIKA EMPATI & AI ---
   void _tentukanKesimpulan() {
     if (_riwayat.isEmpty) {
       _jenisKesimpulan = "Belum Ada Data";
@@ -75,7 +73,6 @@ class _StatistikPertumbuhanScreenState extends State<StatistikPertumbuhanScreen>
       return;
     }
 
-    // Coba cari data AI untuk Berat Badan (sebagai parameter utama kesimpulan)
     Map<String, dynamic>? prediksiBB;
     try {
       prediksiBB = _listPrediksi.firstWhere((p) => p['metrik'] == 'berat_badan');
@@ -83,7 +80,6 @@ class _StatistikPertumbuhanScreenState extends State<StatistikPertumbuhanScreen>
       prediksiBB = null;
     }
 
-    // JIKA AI SUDAH MENGHITUNG, GUNAKAN HASIL AI
     if (prediksiBB != null) {
       String statusGizi = prediksiBB['status_gizi'] ?? "Normal";
       double nilaiPrediksi = double.tryParse(prediksiBB['nilai_prediksi'].toString()) ?? 0.0;
@@ -95,12 +91,9 @@ class _StatistikPertumbuhanScreenState extends State<StatistikPertumbuhanScreen>
       } else {
         _kesimpulan = "Sistem mendeteksi indikasi $statusGizi. AI memprediksi berat bulan depan sekitar ${nilaiPrediksi.toStringAsFixed(1)} kg. Jangan panik ya Bun, yuk pantau ekstra dan konsultasikan dengan dokter anak agar penanganannya tepat. Peluk hangat untuk Bunda! 🫂";
       }
-      return; // Stop di sini, tidak perlu pakai logika manual di bawah
+      return; 
     }
 
-    // ==========================================
-    // JIKA AI BELUM JALAN, PAKAI LOGIKA MANUAL BUNDA SEBAGAI FALLBACK
-    // ==========================================
     if (_riwayat.length == 1) {
       _jenisKesimpulan = "Awal yang Baik";
       _kesimpulan = "Data pertama ${widget.namaAnak} sudah tercatat! Terus pantau dan catat pertumbuhannya bulan depan untuk melihat trennya ya. Bunda hebat! 💖";
@@ -225,7 +218,6 @@ class _StatistikPertumbuhanScreenState extends State<StatistikPertumbuhanScreen>
       }).toList();
     }
 
-    // Cari tahu apakah ada prediksi untuk chart ini
     String targetMetrik = isBerat ? 'berat_badan' : 'tinggi_badan';
     Map<String, dynamic>? prediksiAktif;
     try {
@@ -245,15 +237,35 @@ class _StatistikPertumbuhanScreenState extends State<StatistikPertumbuhanScreen>
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(title, style: TextStyle(fontWeight: FontWeight.bold, color: navyDark, fontSize: 15)),
-          const SizedBox(height: 25),
+          const SizedBox(height: 15),
           
+          // --- KETERANGAN SUMBU Y ---
+          Row(
+            children: [
+              Icon(Icons.arrow_upward, size: 12, color: navyDark.withOpacity(0.6)),
+              const SizedBox(width: 4),
+              Text(
+                "Sumbu Y : ${isBerat ? 'Nilai Berat (Kg)' : 'Nilai Tinggi (cm)'}", 
+                style: TextStyle(color: navyDark.withOpacity(0.7), fontSize: 11, fontWeight: FontWeight.bold)
+              ),
+            ],
+          ),
+          const SizedBox(height: 10),
+
           if (dataPoints.isEmpty)
              SizedBox(
                height: 150,
                child: Center(child: Text("Belum ada data grafik", style: TextStyle(color: navyDark.withOpacity(0.5)))),
              )
           else
-             SizedBox(
+             Container(
+               padding: const EdgeInsets.only(left: 10, right: 10, bottom: 5),
+               decoration: BoxDecoration(
+                 border: Border(
+                   left: BorderSide(color: navyDark.withOpacity(0.3), width: 2), // Garis Sumbu Y
+                   bottom: BorderSide(color: navyDark.withOpacity(0.3), width: 2), // Garis Sumbu X
+                 )
+               ),
                height: 180,
                width: double.infinity,
                child: CustomPaint(
@@ -261,11 +273,26 @@ class _StatistikPertumbuhanScreenState extends State<StatistikPertumbuhanScreen>
                    dataPoints: dataPoints,
                    lineColor: navyDark,
                    dotColor: softPink,
+                   isBerat: isBerat, // Lempar status berat/tinggi untuk hitung min-max
                  ),
                ),
              ),
              
-          // BADGE PREDIKSI AI DI BAWAH GRAFIK
+          const SizedBox(height: 8),
+
+          // --- KETERANGAN SUMBU X ---
+          Row(
+            mainAxisAlignment: MainAxisAlignment.end,
+            children: [
+              Text(
+                "Sumbu X : Waktu (Kiri: Awal ➔ Kanan: Terbaru)", 
+                style: TextStyle(color: navyDark.withOpacity(0.7), fontSize: 11, fontWeight: FontWeight.bold)
+              ),
+              const SizedBox(width: 4),
+              Icon(Icons.arrow_forward, size: 12, color: navyDark.withOpacity(0.6)),
+            ],
+          ),
+
           if (prediksiAktif != null) ...[
             const SizedBox(height: 20),
             Container(
@@ -283,7 +310,29 @@ class _StatistikPertumbuhanScreenState extends State<StatistikPertumbuhanScreen>
                   ),
                 ],
               ),
-            )
+            ),
+            
+            const SizedBox(height: 10), // Jarak kecil antara kotak AI dan teks catatan
+            
+            // --- TAMBAHAN DISCLAIMER MEDIS DI SINI ---
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Icon(Icons.info_outline, size: 14, color: navyDark.withOpacity(0.6)),
+                const SizedBox(width: 6),
+                Expanded(
+                  child: Text(
+                    "*Catatan: Angka ini adalah estimasi sistem berdasarkan tren grafik sebelumnya. Tetap jadikan dokter anak sebagai rujukan utama ya, Bun.",
+                    style: TextStyle(
+                      color: navyDark.withOpacity(0.7), 
+                      fontSize: 11, 
+                      fontStyle: FontStyle.italic,
+                      height: 1.3,
+                    ),
+                  ),
+                ),
+              ],
+            ),
           ]
         ],
       ),
@@ -296,15 +345,21 @@ class SimpleLineChartPainter extends CustomPainter {
   final List<double> dataPoints;
   final Color lineColor;
   final Color dotColor;
+  final bool isBerat;
 
-  SimpleLineChartPainter({required this.dataPoints, required this.lineColor, required this.dotColor});
+  SimpleLineChartPainter({required this.dataPoints, required this.lineColor, required this.dotColor, required this.isBerat});
 
   @override
   void paint(Canvas canvas, Size size) {
     if (dataPoints.isEmpty) return;
 
-    final double maxVal = dataPoints.reduce((a, b) => a > b ? a : b) * 1.2; // Kasih ruang di atas
-    final double minVal = 0; // Mulai dari 0
+    // Hitung dinamis agar grafik tidak flat/menggantung di atas
+    double dataMax = dataPoints.reduce(max);
+    double dataMin = dataPoints.reduce(min);
+    
+    final double gap = isBerat ? 3.0 : 10.0; 
+    final double maxVal = dataMax + gap; 
+    final double minVal = (dataMin - gap).clamp(0, double.infinity);
 
     final paintLine = Paint()
       ..color = lineColor

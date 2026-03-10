@@ -86,10 +86,13 @@ class _AnakScreenState extends State<AnakScreen> {
           .eq('anak_id', childId)
           .order('tanggal_pengukuran', ascending: false);
 
+      String metrikYangDicari = isBeratBadan ? 'berat_badan' : 'tinggi_badan';
+
       final dataPrediksi = await Supabase.instance.client
           .from('prediksi_pertumbuhan')
           .select()
           .eq('anak_id', childId)
+          .eq('metrik', metrikYangDicari) 
           .order('tanggal_prediksi', ascending: false)
           .limit(1);
 
@@ -108,7 +111,11 @@ class _AnakScreenState extends State<AnakScreen> {
 
   List<double> _getChartData() {
     if (_riwayatPertumbuhan.isEmpty) return [];
-    var recentData = _riwayatPertumbuhan.take(5).toList();
+    
+    // FIX: Mengubah take(5) menjadi take(12) agar bisa menampilkan 1 tahun data
+    // Jangan hapus take sepenuhnya agar titik grafik tidak terlalu dempet jika data sudah bertahun-tahun
+    // Mengambil maksimal 60 data (5 tahun x 12 bulan)
+var recentData = _riwayatPertumbuhan.take(60).toList();
     recentData = recentData.reversed.toList(); 
 
     return recentData.map((e) {
@@ -166,23 +173,42 @@ class _AnakScreenState extends State<AnakScreen> {
     );
   }
 
-  // --- WIDGET ANALISIS SISTEM (DIPERBAIKI) ---
+  // --- WIDGET ANALISIS & SARAN PINTAR ---
   Widget _buildStatusPertumbuhan(String name) {
     String rawStatus = _prediksiTerbaru?['status_gizi'] ?? "";
-    bool isInvalid = rawStatus.isEmpty || rawStatus.contains("TIDAK DAPAT DIHITUNG");
-
-    String pesan = isInvalid 
-        ? "Data belum cukup untuk dianalisis. Yuk, rutin catat pertumbuhan si kecil setiap bulan!"
-        : "Berdasarkan data terbaru, status gizi $name saat ini adalah $rawStatus.";
     
+    bool isInvalid = rawStatus.isEmpty || 
+                     rawStatus.toLowerCase().contains("gagal") || 
+                     rawStatus.toLowerCase().contains("luar jangkauan");
+
+    String judul = "💡 Hasil Analisis & Prediksi AI";
+    String pesan = "";
     Color boxColor = fieldPink;
-    if (!isInvalid) {
-      if (rawStatus.toLowerCase().contains("normal") || rawStatus.toLowerCase().contains("baik")) {
+    IconData iconData = Icons.analytics_outlined;
+
+    if (isInvalid) {
+      pesan = "Data belum cukup untuk prediksi AI (Minimal 3 data). Yuk, rutin catat pertumbuhan $name setiap bulan!";
+      boxColor = Colors.orangeAccent.withOpacity(0.3);
+    } else {
+      String statusLower = rawStatus.toLowerCase();
+      
+      pesan = "Berdasarkan tren grafik $name, AI memprediksi status gizinya bulan depan berpotensi mengarah ke: *$rawStatus*.\n\n";
+
+      if (statusLower.contains("normal") || statusLower.contains("baik")) {
         boxColor = successGreen;
-        pesan += " Terus jaga asupan gizinya ya bun!";
-      } else {
+        iconData = Icons.check_circle_outline;
+        pesan += "Saran untuk Bunda:\nWah, hebat Bun! Pertumbuhan $name sangat baik. Terus pertahankan asupan bergizi seimbangnya dan rutin ke Posyandu ya!";
+      } else if (statusLower.contains("risiko") || statusLower.contains("lebih") || statusLower.contains("tinggi")) {
         boxColor = Colors.orangeAccent.withOpacity(0.7);
-        pesan += " Sebaiknya konsultasikan dengan tenaga kesehatan.";
+        iconData = Icons.warning_amber_rounded;
+        pesan += "Saran untuk Bunda:\nJangan panik Bun, ini baru prediksi awal. Coba mulai kontrol porsi asupannya dan hindari camilan/minuman manis berlebih. Ajak si kecil lebih banyak beraktivitas fisik (seperti merangkak atau bermain aktif). Konsultasikan ke bidan/dokter jika perlu.";
+      } else if (statusLower.contains("kurang") || statusLower.contains("buruk") || statusLower.contains("pendek")) {
+        boxColor = Colors.redAccent.withOpacity(0.7);
+        iconData = Icons.error_outline;
+        pesan += "Saran untuk Bunda:\nBunda, yuk kita kejar pertumbuhannya! Tambahkan porsi Protein Hewani (seperti telur, ikan, daging, atau hati ayam) dan lemak tambahan (minyak/mentega/santan) di menu hariannya, pastikan di luar makanan yang bikin alergi ya. Jangan ragu untuk segera konsultasi ke Puskesmas/Dokter Anak.";
+      } else {
+        boxColor = fieldPink;
+        pesan += "Saran untuk Bunda:\nTetap pantau kurva pertumbuhannya dengan teliti dan konsultasikan dengan tenaga kesehatan di Posyandu/Klinik terdekat.";
       }
     }
 
@@ -194,18 +220,19 @@ class _AnakScreenState extends State<AnakScreen> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(children: [
-            Icon(Icons.analytics_outlined, color: navyDark, size: 22),
+            Icon(iconData, color: navyDark, size: 24),
             const SizedBox(width: 10),
-            Text("Analisis Sistem", style: TextStyle(color: navyDark, fontWeight: FontWeight.bold, fontSize: 16))
+            Expanded(
+              child: Text(judul, style: TextStyle(color: navyDark, fontWeight: FontWeight.bold, fontSize: 16)),
+            )
           ]),
-          const SizedBox(height: 10),
-          Text(pesan, style: TextStyle(color: navyDark.withOpacity(0.9), fontSize: 13, height: 1.4)),
+          const SizedBox(height: 12),
+          Text(pesan, style: TextStyle(color: navyDark.withOpacity(0.9), fontSize: 13, height: 1.5)),
         ],
       ),
     );
   }
 
-  // --- WIDGET PREDIKSI GIZI (SOLUSI OVERFLOW) ---
   Widget _buildPrediksiGizi() {
     String status = _prediksiTerbaru?['status_gizi'] ?? "Menunggu Data";
 
@@ -258,7 +285,6 @@ class _AnakScreenState extends State<AnakScreen> {
     );
   }
 
-  // --- SISA WIDGET PENDUKUNG ---
   Widget _buildHeader(Map<String, dynamic> child) {
     return Container(
       width: double.infinity,
@@ -398,7 +424,13 @@ class _AnakScreenState extends State<AnakScreen> {
 
   Widget _buildToggleButton(String title, bool isActive) {
     return GestureDetector(
-      onTap: () => setState(() => isBeratBadan = (title == "Berat Badan")),
+      onTap: () {
+        setState(() { 
+          isBeratBadan = (title == "Berat Badan"); 
+          _isLoading = true; 
+        });
+        _fetchRiwayat(selectedIndex); 
+      },
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 200),
         padding: const EdgeInsets.symmetric(vertical: 14),
@@ -409,6 +441,7 @@ class _AnakScreenState extends State<AnakScreen> {
     );
   }
 
+  // --- WIDGET CHART DENGAN LABEL X DAN Y ---
   Widget _buildDynamicChartCard() {
     List<double> chartData = _getChartData();
 
@@ -426,14 +459,51 @@ class _AnakScreenState extends State<AnakScreen> {
           Text(isBeratBadan ? "Kurva Berat Badan" : "Kurva Tinggi Badan", style: TextStyle(color: navyDark, fontWeight: FontWeight.bold, fontSize: 16)),
           const SizedBox(height: 5),
           Text("Standar Pertumbuhan Kemenkes (KIA)", style: TextStyle(color: navyDark.withOpacity(0.5), fontSize: 11)),
-          const SizedBox(height: 15),
-          SizedBox(
+          const SizedBox(height: 20),
+          
+          // KETERANGAN SUMBU Y
+          Row(
+            children: [
+              Icon(Icons.arrow_upward, size: 12, color: navyDark.withOpacity(0.6)),
+              const SizedBox(width: 4),
+              Text(
+                "Sumbu Y : ${isBeratBadan ? 'Nilai Berat (Kg)' : 'Nilai Tinggi (cm)'}", 
+                style: TextStyle(color: navyDark.withOpacity(0.7), fontSize: 11, fontWeight: FontWeight.bold)
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          
+          // AREA GRAFIK
+          Container(
+            padding: const EdgeInsets.only(left: 10, right: 10, bottom: 5),
+            decoration: BoxDecoration(
+              border: Border(
+                left: BorderSide(color: navyDark.withOpacity(0.3), width: 2), // Garis Sumbu Y
+                bottom: BorderSide(color: navyDark.withOpacity(0.3), width: 2), // Garis Sumbu X
+              )
+            ),
             height: 200,
             child: CustomPaint(
               size: Size.infinite,
               painter: DynamicChartPainter(navyDark, chartData, isBeratBadan),
             ),
           ),
+          const SizedBox(height: 8),
+
+          // KETERANGAN SUMBU X
+          Row(
+            mainAxisAlignment: MainAxisAlignment.end,
+            children: [
+              Text(
+                "Sumbu X : Waktu (Kiri: Terlama ➔ Kanan: Terbaru)", 
+                style: TextStyle(color: navyDark.withOpacity(0.7), fontSize: 11, fontWeight: FontWeight.bold)
+              ),
+              const SizedBox(width: 4),
+              Icon(Icons.arrow_forward, size: 12, color: navyDark.withOpacity(0.6)),
+            ],
+          ),
+
           const SizedBox(height: 20),
           const Divider(),
           const SizedBox(height: 10),
