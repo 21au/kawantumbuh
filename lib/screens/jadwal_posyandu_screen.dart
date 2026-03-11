@@ -1,6 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
-import 'package:intl/intl.dart'; // Jangan lupa tambahkan package intl di pubspec.yaml ya!
+import 'package:intl/intl.dart'; 
+import 'catat_pertumbuhan_screen.dart';
+// TAMBAHAN: Import notification helper
+// (Pakai titik dua '../' karena posisinya ada di luar folder screens)
+import '../notification_helper.dart'; 
 
 class JadwalPosyanduScreen extends StatefulWidget {
   final String anakId;
@@ -52,12 +56,12 @@ class _JadwalPosyanduScreenState extends State<JadwalPosyanduScreen> {
     }
   }
 
-  // Dialog untuk tambah jadwal baru
+  // --- DIALOG TAMBAH JADWAL ---
   Future<void> _tambahJadwal() async {
     DateTime? pickedDate = await showDatePicker(
       context: context,
       initialDate: DateTime.now(),
-      firstDate: DateTime.now(), // Cuma bisa pilih hari ini atau ke depan
+      firstDate: DateTime.now(), 
       lastDate: DateTime(DateTime.now().year + 2),
       builder: (context, child) {
         return Theme(
@@ -75,86 +79,205 @@ class _JadwalPosyanduScreenState extends State<JadwalPosyanduScreen> {
 
     if (pickedDate == null) return;
 
-    TextEditingController keteranganController = TextEditingController();
+    TextEditingController catatanController = TextEditingController();
+    
+    List<String> pilihanKegiatan = [
+      "Timbang & Ukur Rutin",
+      "Imunisasi",
+      "Pemberian Vitamin A",
+      "Obat Cacing",
+      "Konsultasi Bidan/Dokter",
+      "Lainnya"
+    ];
+    String kegiatanTerpilih = pilihanKegiatan.first;
 
     if (!mounted) return;
+    showDialog(
+      context: context,
+      builder: (context) => StatefulBuilder(
+        builder: (context, setStateDialog) {
+          return AlertDialog(
+            backgroundColor: softPink,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+            title: Text("Detail Jadwal Posyandu", style: TextStyle(color: navyDark, fontWeight: FontWeight.bold, fontSize: 18)),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text("Agenda Utama", style: TextStyle(color: navyDark, fontWeight: FontWeight.bold, fontSize: 14)),
+                const SizedBox(height: 8),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 12),
+                  decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(15)),
+                  child: DropdownButtonHideUnderline(
+                    child: DropdownButton<String>(
+                      isExpanded: true,
+                      value: kegiatanTerpilih,
+                      icon: Icon(Icons.arrow_drop_down, color: navyDark),
+                      items: pilihanKegiatan.map((String value) {
+                        return DropdownMenuItem<String>(value: value, child: Text(value, style: TextStyle(color: navyDark)));
+                      }).toList(),
+                      onChanged: (newValue) => setStateDialog(() => kegiatanTerpilih = newValue!),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 15),
+                Text("Catatan (Opsional)", style: TextStyle(color: navyDark, fontWeight: FontWeight.bold, fontSize: 14)),
+                const SizedBox(height: 8),
+                TextField(
+                  controller: catatanController,
+                  decoration: InputDecoration(
+                    hintText: "Cth: Imunisasi DPT / Bawa KIA",
+                    hintStyle: TextStyle(color: Colors.grey.shade400, fontSize: 14),
+                    filled: true,
+                    fillColor: Colors.white,
+                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(15), borderSide: BorderSide.none),
+                  ),
+                ),
+              ],
+            ),
+            actions: [
+              TextButton(onPressed: () => Navigator.pop(context), child: Text("Batal", style: TextStyle(color: navyDark.withOpacity(0.6)))),
+              ElevatedButton(
+                style: ElevatedButton.styleFrom(backgroundColor: navyDark, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15))),
+                onPressed: () async {
+                  Navigator.pop(context);
+                  setState(() => _isLoading = true);
+                  
+                  String hasilKeterangan = kegiatanTerpilih;
+                  if (catatanController.text.isNotEmpty) hasilKeterangan += " - ${catatanController.text}";
+
+                  try {
+                    await Supabase.instance.client.from('jadwal_posyandu').insert({
+                      'anak_id': widget.anakId,
+                      'tanggal': pickedDate.toIso8601String(),
+                      'keterangan': hasilKeterangan,
+                      'is_selesai': false,
+                    });
+
+                    // --- TAMBAHAN UNTUK NOTIFIKASI (SUDAH DIPERBAIKI) ---
+                    // Atur notifikasi untuk H-1 pada jam 08:00 Pagi
+                    DateTime waktuNotif = DateTime(
+                      pickedDate.year, 
+                      pickedDate.month, 
+                      pickedDate.day, 
+                      8, 0 // Jam 08:00 Pagi
+                    ).subtract(const Duration(days: 1)); // Mundur 1 hari
+
+                    // Jika H-1 sudah lewat (misal jadwalku dibuat untuk hari ini juga), 
+                    // jadwalkan notif 1 menit dari sekarang untuk testing/pengingat dadakan
+                    if (waktuNotif.isBefore(DateTime.now())) {
+                      waktuNotif = DateTime.now().add(const Duration(minutes: 1));
+                    }
+
+                    int notifId = DateTime.now().millisecondsSinceEpoch.remainder(100000);
+
+                    // Pemanggilan fungsi yang benar: scheduleNotification
+                    await NotificationHelper.scheduleNotification(
+                      id: notifId,
+                      title: "Pengingat Posyandu! 🗓️",
+                      body: "Bunda, besok ada jadwal $hasilKeterangan untuk ${widget.namaAnak}. Jangan lupa ya!",
+                      scheduledDate: waktuNotif,
+                    );
+                    // ---------------------------------
+
+                    _fetchJadwal();
+                  } catch (e) {
+                    debugPrint("Error simpan jadwal: $e");
+                    setState(() => _isLoading = false);
+                  }
+                },
+                child: const Text("Simpan", style: TextStyle(color: Colors.white)),
+              ),
+            ],
+          );
+        }
+      ),
+    );
+  }
+
+  // --- UPGRADE: NOTIFIKASI DIALOG SAAT SELESAI ---
+  void _tandaiSelesai(Map<String, dynamic> jadwal) async {
+    try {
+      await Supabase.instance.client.from('jadwal_posyandu').update({'is_selesai': true}).eq('id', jadwal['id']);
+      _fetchJadwal();
+
+      if (!mounted) return;
+      
+      // Munculkan Pop-up di tengah layar
+      showDialog(
+        context: context,
+        builder: (context) => AlertDialog(
+          backgroundColor: softPink,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(Icons.celebration, color: brightPink, size: 60),
+              const SizedBox(height: 15),
+              Text("Hore! Jadwal Selesai 🎉", style: TextStyle(color: navyDark, fontSize: 20, fontWeight: FontWeight.bold)),
+              const SizedBox(height: 10),
+              Text("Yuk langsung masukkan data pertumbuhan si Kecil biar datanya tersimpan rapi!", 
+                textAlign: TextAlign.center, 
+                style: TextStyle(color: navyDark.withOpacity(0.8), height: 1.5)
+              ),
+            ],
+          ),
+          actionsAlignment: MainAxisAlignment.center,
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: Text("Nanti Saja", style: TextStyle(color: navyDark.withOpacity(0.6))),
+            ),
+            ElevatedButton(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: navyDark,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
+              ),
+              onPressed: () {
+                Navigator.pop(context); // Tutup dialog
+                Navigator.push(context, MaterialPageRoute(builder: (context) => CatatPertumbuhanScreen(anakId: widget.anakId)));
+              },
+              child: const Text("Input Data", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+            ),
+          ],
+        )
+      );
+    } catch (e) {
+      debugPrint("Error update jadwal: $e");
+    }
+  }
+
+  // --- FITUR BARU: HAPUS JADWAL ---
+  // Ubah String menjadi dynamic agar aman kalau tipe data ID-nya INT atau UUID di Supabase
+  void _konfirmasiHapus(dynamic idJadwal) {
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
         backgroundColor: softPink,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        title: Text("Detail Jadwal", style: TextStyle(color: navyDark, fontWeight: FontWeight.bold)),
-        content: TextField(
-          controller: keteranganController,
-          decoration: InputDecoration(
-            hintText: "Cth: Timbang rutin & Imunisasi PCV",
-            filled: true,
-            fillColor: Colors.white,
-            border: OutlineInputBorder(borderRadius: BorderRadius.circular(15), borderSide: BorderSide.none),
-          ),
-        ),
+        title: Text("Hapus Jadwal?", style: TextStyle(color: navyDark, fontWeight: FontWeight.bold)),
+        content: Text("Jadwal yang dihapus tidak bisa dikembalikan ya, Bunda.", style: TextStyle(color: navyDark)),
         actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: Text("Batal", style: TextStyle(color: navyDark.withOpacity(0.6))),
-          ),
+          TextButton(onPressed: () => Navigator.pop(context), child: Text("Batal", style: TextStyle(color: navyDark.withOpacity(0.6)))),
           ElevatedButton(
-            style: ElevatedButton.styleFrom(
-              backgroundColor: navyDark,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
-            ),
+            style: ElevatedButton.styleFrom(backgroundColor: Colors.redAccent, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15))),
             onPressed: () async {
               Navigator.pop(context);
               setState(() => _isLoading = true);
               try {
-                await Supabase.instance.client.from('jadwal_posyandu').insert({
-                  'anak_id': widget.anakId,
-                  'tanggal': pickedDate.toIso8601String(),
-                  'keterangan': keteranganController.text.isNotEmpty ? keteranganController.text : "Jadwal Posyandu",
-                  'is_selesai': false,
-                });
+                await Supabase.instance.client.from('jadwal_posyandu').delete().eq('id', idJadwal);
                 _fetchJadwal();
               } catch (e) {
-                debugPrint("Error simpan jadwal: $e");
+                debugPrint("Error hapus jadwal: $e");
                 setState(() => _isLoading = false);
               }
             },
-            child: const Text("Simpan", style: TextStyle(color: Colors.white)),
+            child: const Text("Hapus", style: TextStyle(color: Colors.white)),
           ),
         ],
       ),
     );
-  }
-
-  // Menandai jadwal selesai dan mengarahkan ke form input data
-  void _tandaiSelesai(Map<String, dynamic> jadwal) async {
-    try {
-      await Supabase.instance.client
-          .from('jadwal_posyandu')
-          .update({'is_selesai': true})
-          .eq('id', jadwal['id']);
-      
-      _fetchJadwal();
-
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: const Text("Hore! Jadwal selesai. Yuk masukkan data pertumbuhannya! 🎉"),
-          backgroundColor: brightPink,
-          action: SnackBarAction(
-            label: "Input Data",
-            textColor: Colors.white,
-            onPressed: () {
-              // TODO: Ganti ini dengan navigasi ke halaman Input Data Pertumbuhan kamu
-              // Navigator.push(context, MaterialPageRoute(builder: (context) => InputDataScreen(anakId: widget.anakId)));
-              debugPrint("Navigasi ke halaman input data");
-            },
-          ),
-        ),
-      );
-    } catch (e) {
-      debugPrint("Error update jadwal: $e");
-    }
   }
 
   @override
@@ -193,16 +316,9 @@ class _JadwalPosyanduScreenState extends State<JadwalPosyanduScreen> {
           children: [
             Icon(Icons.event_busy, size: 80, color: fieldPink),
             const SizedBox(height: 20),
-            Text(
-              "Belum Ada Jadwal Posyandu",
-              style: TextStyle(color: navyDark, fontSize: 18, fontWeight: FontWeight.bold),
-            ),
+            Text("Belum Ada Jadwal Posyandu", style: TextStyle(color: navyDark, fontSize: 18, fontWeight: FontWeight.bold)),
             const SizedBox(height: 10),
-            Text(
-              "Yuk catat jadwal ke Posyandu atau Dokter Anak bulan ini, biar Bunda nggak lupa! 💕",
-              textAlign: TextAlign.center,
-              style: TextStyle(color: navyDark.withOpacity(0.7), fontSize: 14, height: 1.5),
-            ),
+            Text("Yuk catat jadwal ke Posyandu atau Dokter Anak bulan ini, biar Bunda nggak lupa! 💕", textAlign: TextAlign.center, style: TextStyle(color: navyDark.withOpacity(0.7), fontSize: 14, height: 1.5)),
           ],
         ),
       ),
@@ -232,7 +348,7 @@ class _JadwalPosyanduScreenState extends State<JadwalPosyanduScreen> {
           ),
           child: Row(
             children: [
-              // Ikon Kalender Kiri
+              // Ikon Kalender
               Container(
                 padding: const EdgeInsets.all(12),
                 decoration: BoxDecoration(
@@ -248,7 +364,7 @@ class _JadwalPosyanduScreenState extends State<JadwalPosyanduScreen> {
               ),
               const SizedBox(width: 15),
               
-              // Keterangan Tengah
+              // Keterangan
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -271,14 +387,23 @@ class _JadwalPosyanduScreenState extends State<JadwalPosyanduScreen> {
                 ),
               ),
 
-              // Tombol Checklist Kanan
+              // Kanan: Tombol Centang atau Tong Sampah
               if (!isSelesai)
                 IconButton(
                   icon: Icon(Icons.check_circle_outline, color: navyDark, size: 28),
                   onPressed: () => _tandaiSelesai(jadwal),
                 )
               else
-                Icon(Icons.check_circle, color: Colors.green.withOpacity(0.5), size: 28),
+                Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(Icons.check_circle, color: Colors.green.withOpacity(0.5), size: 28),
+                    IconButton(
+                      icon: const Icon(Icons.delete_outline, color: Colors.redAccent),
+                      onPressed: () => _konfirmasiHapus(jadwal['id']),
+                    ),
+                  ],
+                ),
             ],
           ),
         );
