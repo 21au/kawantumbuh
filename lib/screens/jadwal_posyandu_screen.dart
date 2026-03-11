@@ -3,7 +3,6 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:intl/intl.dart'; 
 import 'catat_pertumbuhan_screen.dart';
 // TAMBAHAN: Import notification helper
-// (Pakai titik dua '../' karena posisinya ada di luar folder screens)
 import '../notification_helper.dart'; 
 
 class JadwalPosyanduScreen extends StatefulWidget {
@@ -155,31 +154,30 @@ class _JadwalPosyanduScreenState extends State<JadwalPosyanduScreen> {
                       'is_selesai': false,
                     });
 
-                    // --- TAMBAHAN UNTUK NOTIFIKASI (SUDAH DIPERBAIKI) ---
-                    // Atur notifikasi untuk H-1 pada jam 08:00 Pagi
+                    // --- 1. TES NOTIFIKASI INSTAN (BIAR LANGSUNG BUNYI) ---
+                    await NotificationHelper.tampilkanNotifikasiInstan();
+
+                    // --- 2. JADWALKAN ALARM ASLI (H-1 JAM 8 PAGI) ---
                     DateTime waktuNotif = DateTime(
                       pickedDate.year, 
                       pickedDate.month, 
                       pickedDate.day, 
-                      8, 0 // Jam 08:00 Pagi
-                    ).subtract(const Duration(days: 1)); // Mundur 1 hari
+                      8, 0 
+                    ).subtract(const Duration(days: 1));
 
-                    // Jika H-1 sudah lewat (misal jadwalku dibuat untuk hari ini juga), 
-                    // jadwalkan notif 1 menit dari sekarang untuk testing/pengingat dadakan
+                    // Jika H-1 sudah lewat, set untuk 2 menit lagi sebagai pengingat cadangan
                     if (waktuNotif.isBefore(DateTime.now())) {
-                      waktuNotif = DateTime.now().add(const Duration(minutes: 1));
+                      waktuNotif = DateTime.now().add(const Duration(minutes: 2));
                     }
 
                     int notifId = DateTime.now().millisecondsSinceEpoch.remainder(100000);
 
-                    // Pemanggilan fungsi yang benar: scheduleNotification
                     await NotificationHelper.scheduleNotification(
                       id: notifId,
                       title: "Pengingat Posyandu! 🗓️",
-                      body: "Bunda, besok ada jadwal $hasilKeterangan untuk ${widget.namaAnak}. Jangan lupa ya!",
+                      body: "Besok ada jadwal $hasilKeterangan untuk ${widget.namaAnak}.",
                       scheduledDate: waktuNotif,
                     );
-                    // ---------------------------------
 
                     _fetchJadwal();
                   } catch (e) {
@@ -196,7 +194,6 @@ class _JadwalPosyanduScreenState extends State<JadwalPosyanduScreen> {
     );
   }
 
-  // --- UPGRADE: NOTIFIKASI DIALOG SAAT SELESAI ---
   void _tandaiSelesai(Map<String, dynamic> jadwal) async {
     try {
       await Supabase.instance.client.from('jadwal_posyandu').update({'is_selesai': true}).eq('id', jadwal['id']);
@@ -204,7 +201,6 @@ class _JadwalPosyanduScreenState extends State<JadwalPosyanduScreen> {
 
       if (!mounted) return;
       
-      // Munculkan Pop-up di tengah layar
       showDialog(
         context: context,
         builder: (context) => AlertDialog(
@@ -217,7 +213,7 @@ class _JadwalPosyanduScreenState extends State<JadwalPosyanduScreen> {
               const SizedBox(height: 15),
               Text("Hore! Jadwal Selesai 🎉", style: TextStyle(color: navyDark, fontSize: 20, fontWeight: FontWeight.bold)),
               const SizedBox(height: 10),
-              Text("Yuk langsung masukkan data pertumbuhan si Kecil biar datanya tersimpan rapi!", 
+              Text("Yuk langsung masukkan data pertumbuhan si Kecil!", 
                 textAlign: TextAlign.center, 
                 style: TextStyle(color: navyDark.withOpacity(0.8), height: 1.5)
               ),
@@ -230,12 +226,9 @@ class _JadwalPosyanduScreenState extends State<JadwalPosyanduScreen> {
               child: Text("Nanti Saja", style: TextStyle(color: navyDark.withOpacity(0.6))),
             ),
             ElevatedButton(
-              style: ElevatedButton.styleFrom(
-                backgroundColor: navyDark,
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
-              ),
+              style: ElevatedButton.styleFrom(backgroundColor: navyDark, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15))),
               onPressed: () {
-                Navigator.pop(context); // Tutup dialog
+                Navigator.pop(context);
                 Navigator.push(context, MaterialPageRoute(builder: (context) => CatatPertumbuhanScreen(anakId: widget.anakId)));
               },
               child: const Text("Input Data", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
@@ -244,12 +237,10 @@ class _JadwalPosyanduScreenState extends State<JadwalPosyanduScreen> {
         )
       );
     } catch (e) {
-      debugPrint("Error update jadwal: $e");
+      debugPrint("Error: $e");
     }
   }
 
-  // --- FITUR BARU: HAPUS JADWAL ---
-  // Ubah String menjadi dynamic agar aman kalau tipe data ID-nya INT atau UUID di Supabase
   void _konfirmasiHapus(dynamic idJadwal) {
     showDialog(
       context: context,
@@ -257,7 +248,7 @@ class _JadwalPosyanduScreenState extends State<JadwalPosyanduScreen> {
         backgroundColor: softPink,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
         title: Text("Hapus Jadwal?", style: TextStyle(color: navyDark, fontWeight: FontWeight.bold)),
-        content: Text("Jadwal yang dihapus tidak bisa dikembalikan ya, Bunda.", style: TextStyle(color: navyDark)),
+        content: Text("Jadwal tidak bisa dikembalikan ya, Bunda.", style: TextStyle(color: navyDark)),
         actions: [
           TextButton(onPressed: () => Navigator.pop(context), child: Text("Batal", style: TextStyle(color: navyDark.withOpacity(0.6)))),
           ElevatedButton(
@@ -269,7 +260,7 @@ class _JadwalPosyanduScreenState extends State<JadwalPosyanduScreen> {
                 await Supabase.instance.client.from('jadwal_posyandu').delete().eq('id', idJadwal);
                 _fetchJadwal();
               } catch (e) {
-                debugPrint("Error hapus jadwal: $e");
+                debugPrint("Error: $e");
                 setState(() => _isLoading = false);
               }
             },
@@ -316,9 +307,9 @@ class _JadwalPosyanduScreenState extends State<JadwalPosyanduScreen> {
           children: [
             Icon(Icons.event_busy, size: 80, color: fieldPink),
             const SizedBox(height: 20),
-            Text("Belum Ada Jadwal Posyandu", style: TextStyle(color: navyDark, fontSize: 18, fontWeight: FontWeight.bold)),
+            Text("Belum Ada Jadwal", style: TextStyle(color: navyDark, fontSize: 18, fontWeight: FontWeight.bold)),
             const SizedBox(height: 10),
-            Text("Yuk catat jadwal ke Posyandu atau Dokter Anak bulan ini, biar Bunda nggak lupa! 💕", textAlign: TextAlign.center, style: TextStyle(color: navyDark.withOpacity(0.7), fontSize: 14, height: 1.5)),
+            Text("Yuk catat jadwal ke Posyandu atau Dokter Anak! 💕", textAlign: TextAlign.center, style: TextStyle(color: navyDark.withOpacity(0.7))),
           ],
         ),
       ),
@@ -328,7 +319,6 @@ class _JadwalPosyanduScreenState extends State<JadwalPosyanduScreen> {
   Widget _buildJadwalList() {
     return ListView.builder(
       padding: const EdgeInsets.only(left: 20, right: 20, top: 10, bottom: 80),
-      physics: const BouncingScrollPhysics(),
       itemCount: _jadwalList.length,
       itemBuilder: (context, index) {
         final jadwal = _jadwalList[index];
@@ -341,18 +331,13 @@ class _JadwalPosyanduScreenState extends State<JadwalPosyanduScreen> {
           decoration: BoxDecoration(
             color: isSelesai ? Colors.white.withOpacity(0.5) : Colors.white,
             borderRadius: BorderRadius.circular(20),
-            boxShadow: [
-              if (!isSelesai) 
-                BoxShadow(color: navyDark.withOpacity(0.05), blurRadius: 10, offset: const Offset(0, 5))
-            ]
           ),
           child: Row(
             children: [
-              // Ikon Kalender
               Container(
                 padding: const EdgeInsets.all(12),
                 decoration: BoxDecoration(
-                  color: isSelesai ? fieldPink.withOpacity(0.5) : fieldPink,
+                  color: fieldPink,
                   borderRadius: BorderRadius.circular(15),
                 ),
                 child: Column(
@@ -363,8 +348,6 @@ class _JadwalPosyanduScreenState extends State<JadwalPosyanduScreen> {
                 ),
               ),
               const SizedBox(width: 15),
-              
-              // Keterangan
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -372,7 +355,7 @@ class _JadwalPosyanduScreenState extends State<JadwalPosyanduScreen> {
                     Text(
                       jadwal['keterangan'] ?? "Jadwal",
                       style: TextStyle(
-                        color: isSelesai ? navyDark.withOpacity(0.5) : navyDark, 
+                        color: navyDark, 
                         fontSize: 15, 
                         fontWeight: FontWeight.bold,
                         decoration: isSelesai ? TextDecoration.lineThrough : null
@@ -386,23 +369,15 @@ class _JadwalPosyanduScreenState extends State<JadwalPosyanduScreen> {
                   ],
                 ),
               ),
-
-              // Kanan: Tombol Centang atau Tong Sampah
               if (!isSelesai)
                 IconButton(
                   icon: Icon(Icons.check_circle_outline, color: navyDark, size: 28),
                   onPressed: () => _tandaiSelesai(jadwal),
                 )
               else
-                Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Icon(Icons.check_circle, color: Colors.green.withOpacity(0.5), size: 28),
-                    IconButton(
-                      icon: const Icon(Icons.delete_outline, color: Colors.redAccent),
-                      onPressed: () => _konfirmasiHapus(jadwal['id']),
-                    ),
-                  ],
+                IconButton(
+                  icon: const Icon(Icons.delete_outline, color: Colors.redAccent),
+                  onPressed: () => _konfirmasiHapus(jadwal['id']),
                 ),
             ],
           ),
