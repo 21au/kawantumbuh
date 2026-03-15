@@ -1,0 +1,449 @@
+import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'dart:math';
+
+class GrafikLengkapScreen extends StatefulWidget {
+  final List<Map<String, dynamic>> riwayatData;
+  final bool isBeratBadan;
+  final String namaAnak;
+  final String tanggalLahir;
+  final String jenisKelamin;
+
+  const GrafikLengkapScreen({
+    super.key,
+    required this.riwayatData,
+    required this.isBeratBadan,
+    required this.namaAnak,
+    required this.tanggalLahir,
+    required this.jenisKelamin,
+  });
+
+  @override
+  State<GrafikLengkapScreen> createState() => _GrafikLengkapScreenState();
+}
+
+class _GrafikLengkapScreenState extends State<GrafikLengkapScreen> {
+  late Color kmsBackground;
+  final Color zoneGreenDark = const Color(0xFF4CAF50);
+  final Color zoneGreenLight = const Color(0xFF81C784);
+  final Color zoneYellow = const Color(0xFFFFD54F);
+  final Color zoneRedLine = const Color(0xFFD32F2F);
+
+  List<Map<String, double>> plottedPoints = [];
+
+  @override
+  void initState() {
+    super.initState();
+    SystemChrome.setPreferredOrientations([
+      DeviceOrientation.landscapeRight,
+      DeviceOrientation.landscapeLeft,
+    ]);
+
+    kmsBackground = widget.jenisKelamin.toLowerCase() == 'laki-laki'
+        ? const Color(0xFFE3F2FD)
+        : const Color(0xFFFCE4EC);
+
+    _calculatePoints();
+  }
+
+  @override
+  void dispose() {
+    SystemChrome.setPreferredOrientations([
+      DeviceOrientation.portraitUp,
+      DeviceOrientation.portraitDown,
+    ]);
+    super.dispose();
+  }
+
+  void _calculatePoints() {
+    if (widget.tanggalLahir.isEmpty) return;
+    DateTime birthDate = DateTime.parse(widget.tanggalLahir);
+
+    for (var data in widget.riwayatData) {
+      if (data['tanggal_pengukuran'] == null) continue;
+      DateTime measureDate = DateTime.parse(data['tanggal_pengukuran']);
+      
+      int months = (measureDate.year - birthDate.year) * 12 + measureDate.month - birthDate.month;
+      
+      var val = widget.isBeratBadan ? data['berat_badan'] : data['tinggi_badan'];
+      double value = double.tryParse(val.toString()) ?? 0.0;
+
+      if (months >= 0) {
+        plottedPoints.add({'umur': months.toDouble(), 'nilai': value});
+      }
+    }
+    plottedPoints.sort((a, b) => a['umur']!.compareTo(b['umur']!));
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    const double maxAgeMonths = 60;
+    final double maxValue = widget.isBeratBadan ? 25.0 : 120.0;
+    final double minValue = widget.isBeratBadan ? 0.0 : 40.0;
+
+    return Scaffold(
+      backgroundColor: kmsBackground,
+      body: SafeArea(
+        child: Row(
+          children: [
+            Expanded(
+              flex: 7,
+              child: Stack(
+                children: [
+                  LayoutBuilder(
+                    builder: (context, constraints) {
+                      double canvasHeight = constraints.maxHeight;
+                      double canvasWidth = canvasHeight * 3.5; // Sedikit lebih panjang agar teks di atas lega
+
+                      return InteractiveViewer(
+                        constrained: false,
+                        boundaryMargin: const EdgeInsets.all(50),
+                        minScale: 0.5,
+                        maxScale: 4.0,
+                        child: Container(
+                          color: Colors.white,
+                          padding: const EdgeInsets.only(top: 20, right: 40, bottom: 80, left: 60),
+                          width: canvasWidth,
+                          height: canvasHeight,
+                          child: CustomPaint(
+                            size: Size(canvasWidth, canvasHeight - 100), 
+                            painter: BukuKmsPainter(
+                              isBerat: widget.isBeratBadan,
+                              dataPoints: plottedPoints,
+                              maxAge: maxAgeMonths,
+                              maxValue: maxValue,
+                              minValue: minValue,
+                            ),
+                          ),
+                        ),
+                      );
+                    },
+                  ),
+                  
+                  Positioned(
+                    bottom: 15, left: 0, right: 0,
+                    child: Center(
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                        decoration: BoxDecoration(color: Colors.black87.withOpacity(0.7), borderRadius: BorderRadius.circular(20)),
+                        child: const Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(Icons.pinch, color: Colors.white, size: 14),
+                            SizedBox(width: 8),
+                            Text("Zoom & Geser dengan 2 jari", style: TextStyle(color: Colors.white, fontSize: 11)),
+                          ],
+                        ),
+                      ),
+                    ),
+                  )
+                ],
+              ),
+            ),
+
+            Container(
+              width: 300, 
+              decoration: BoxDecoration(color: Colors.white, boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.1), blurRadius: 10, offset: const Offset(-3, 0))]),
+              child: Column(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(16),
+                    color: kmsBackground.withOpacity(0.5),
+                    child: Row(
+                      children: [
+                        IconButton(icon: const Icon(Icons.arrow_back_ios_new, size: 20), onPressed: () => Navigator.pop(context), style: IconButton.styleFrom(backgroundColor: Colors.white)),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(widget.namaAnak, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                              Text("Buku KIA ${widget.isBeratBadan ? '(BB)' : '(TB)'}", style: const TextStyle(fontSize: 12, color: Colors.black54)),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  Expanded(
+                    child: SingleChildScrollView(
+                      padding: const EdgeInsets.all(16),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Text("Panduan Membaca KMS", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+                          const SizedBox(height: 15),
+                          _legendItem(zoneGreenDark, "Pita Hijau Tua", "Pertumbuhan Ideal / Normal."),
+                          const SizedBox(height: 12),
+                          _legendItem(zoneGreenLight, "Pita Hijau Muda", "Masih Normal, pantau trennya."),
+                          const SizedBox(height: 12),
+                          _legendItem(zoneYellow, "Pita Kuning", "Waspada! Risiko gizi kurang/lebih."),
+                          const SizedBox(height: 12),
+                          _legendItem(zoneRedLine, "BGM", "Sangat Kurang! Rujuk ke Faskes.", isLine: true),
+                          const Padding(padding: EdgeInsets.symmetric(vertical: 15), child: Divider()),
+                          const Text("Istilah Posyandu:", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+                          const SizedBox(height: 8),
+                          _textLegend("N (Naik)", "Grafik memotong garis sejajar di atasnya."),
+                          const SizedBox(height: 8),
+                          _textLegend("T (Tidak Naik)", "Grafik mendatar/menurun."),
+                        ],
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            )
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _legendItem(Color color, String title, String desc, {bool isLine = false}) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Container(margin: const EdgeInsets.only(top: 2), width: 14, height: isLine ? 4 : 14, decoration: isLine ? null : BoxDecoration(color: color, shape: BoxShape.rectangle), color: isLine ? color : null),
+        const SizedBox(width: 10),
+        Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text(title, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12)), Text(desc, style: const TextStyle(fontSize: 11, color: Colors.black87, height: 1.3))]))
+      ],
+    );
+  }
+
+  Widget _textLegend(String title, String desc) {
+    return Row(crossAxisAlignment: CrossAxisAlignment.start, children: [SizedBox(width: 80, child: Text(title, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12))), Expanded(child: Text(desc, style: const TextStyle(fontSize: 11, color: Colors.black87, height: 1.3)))]);
+  }
+}
+
+// ============================================================================
+// PELUKIS KANVAS BUKU KIA 
+// ============================================================================
+class BukuKmsPainter extends CustomPainter {
+  final bool isBerat;
+  final List<Map<String, double>> dataPoints;
+  final double maxAge; 
+  final double maxValue; 
+  final double minValue; 
+
+  // Area atas khusus untuk ilustrasi milestone (dalam pixel)
+  final double headerHeight = 90.0; 
+
+  BukuKmsPainter({
+    required this.isBerat,
+    required this.dataPoints,
+    required this.maxAge,
+    required this.maxValue,
+    required this.minValue,
+  });
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final w = size.width;
+    final h = size.height;
+
+    _drawMilestones(canvas, w); // <--- INI FUNGSI BARUNYA
+    _drawKmsZones(canvas, w, h);
+    _drawGridAndLabels(canvas, w, h);
+    _plotUserData(canvas, w, h);
+  }
+
+  // =====================================================================
+  // FUNGSI BARU: MENGGAMBAR ILUSTRASI TUMBUH KEMBANG DI ATAS GRAFIK
+  // =====================================================================
+  void _drawMilestones(Canvas canvas, double w) {
+    final linePaint = Paint()..color = Colors.black54..strokeWidth = 1..style = PaintingStyle.stroke;
+
+    // Data Milestone (Batas Bulan, Deskripsi, dan Emoji Ilustrasi)
+    final milestones = [
+      {'start': 0, 'end': 3, 'desc': 'Mengangkat\nkepala', 'icon': '👶'},
+      {'start': 3, 'end': 6, 'desc': 'Tengkurap\n& Duduk', 'icon': '🧸'},
+      {'start': 6, 'end': 9, 'desc': 'Duduk mandiri\nMerangkak', 'icon': '🧎'},
+      {'start': 9, 'end': 12, 'desc': 'Berdiri\nberpegangan', 'icon': '🧍'},
+      {'start': 12, 'end': 18, 'desc': 'Berjalan\nmandiri', 'icon': '🚶'},
+      {'start': 18, 'end': 24, 'desc': 'Berjalan mundur\nNaik tangga', 'icon': '🏃'},
+      {'start': 24, 'end': 36, 'desc': 'Melompat\nBersepeda', 'icon': '🚴'},
+      {'start': 36, 'end': 60, 'desc': 'Bermain aktif\nMandiri', 'icon': '🤸'},
+    ];
+
+    // Judul Header
+    _drawText(canvas, "PANDUAN PERTUMBUHAN & PERKEMBANGAN ANAK", const Offset(0, -15), const TextStyle(fontWeight: FontWeight.bold, fontSize: 12, color: Colors.red));
+
+    for (var m in milestones) {
+      double startX = ((m['start'] as int) / maxAge) * w;
+      double endX = ((m['end'] as int) / maxAge) * w;
+      double centerX = startX + ((endX - startX) / 2);
+
+      // Garis vertikal pembatas antar milestone
+      if (m['start'] != 0) {
+        canvas.drawLine(Offset(startX, 10), Offset(startX, headerHeight), linePaint);
+      }
+
+      // Gambar Teks Deskripsi
+      final tpDesc = TextPainter(
+        text: TextSpan(text: m['desc'] as String, style: const TextStyle(fontSize: 9, color: Colors.black87)),
+        textAlign: TextAlign.center,
+        textDirection: TextDirection.ltr,
+      )..layout();
+      tpDesc.paint(canvas, Offset(centerX - (tpDesc.width / 2), 15));
+
+      // Gambar Emoji sebagai pengganti ilustrasi bayi
+      final tpIcon = TextPainter(
+        text: TextSpan(text: m['icon'] as String, style: const TextStyle(fontSize: 24)),
+        textDirection: TextDirection.ltr,
+      )..layout();
+      tpIcon.paint(canvas, Offset(centerX - (tpIcon.width / 2), 40));
+      
+      // Keterangan bulan kecil di bawah icon
+      final tpBulan = TextPainter(text: TextSpan(text: "${m['start']}-${m['end']} bln", style: const TextStyle(fontSize: 8, fontWeight: FontWeight.bold, color: Colors.black54)), textDirection: TextDirection.ltr)..layout();
+      tpBulan.paint(canvas, Offset(centerX - (tpBulan.width / 2), 70));
+    }
+    
+    // Garis batas bawah untuk area milestone
+    canvas.drawLine(Offset(0, headerHeight), Offset(w, headerHeight), Paint()..color = Colors.black..strokeWidth = 2);
+  }
+
+  void _drawGridAndLabels(Canvas canvas, double w, double h) {
+    final gridPaint = Paint()..color = Colors.grey.withOpacity(0.5)..strokeWidth = 1;
+    final heavyGridPaint = Paint()..color = Colors.black45..strokeWidth = 1.5;
+    final textStyle = const TextStyle(color: Colors.black87, fontSize: 10);
+    final boldTextStyle = const TextStyle(color: Colors.black87, fontSize: 10, fontWeight: FontWeight.bold);
+
+    // Ketinggian Y sekarang dipotong oleh headerHeight
+    double yStep = (maxValue - minValue);
+    double graphAreaHeight = h - headerHeight; 
+
+    for (int i = 0; i <= yStep; i++) {
+      double y = h - ((i / yStep) * graphAreaHeight);
+      bool isMajorLine = i % 5 == 0; 
+      canvas.drawLine(Offset(0, y), Offset(w, y), isMajorLine ? heavyGridPaint : gridPaint);
+      if (isMajorLine || i % 1 == 0) { 
+        final tp = TextPainter(text: TextSpan(text: "${(minValue + i).toInt()}", style: isMajorLine ? boldTextStyle : textStyle), textDirection: TextDirection.ltr)..layout();
+        tp.paint(canvas, Offset(-25, y - (tp.height / 2)));
+      }
+    }
+
+    final yAxisLabel = TextPainter(text: TextSpan(text: isBerat ? "Berat (kg)" : "Tinggi (cm)", style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.black, fontSize: 12)), textDirection: TextDirection.ltr)..layout();
+    canvas.save();
+    canvas.translate(-45, headerHeight + (graphAreaHeight / 2) + (yAxisLabel.width/2));
+    canvas.rotate(-pi / 2);
+    yAxisLabel.paint(canvas, const Offset(0, 0));
+    canvas.restore();
+
+    double boxHeight = 25.0;
+    double startYBoxes = h + 10;
+    
+    _drawText(canvas, "Umur (Bulan)", Offset(-75, startYBoxes + 6), boldTextStyle);
+    if (isBerat) _drawText(canvas, "Keterangan", Offset(-75, startYBoxes + boxHeight + 6), boldTextStyle);
+
+    for (int i = 0; i <= maxAge; i++) {
+      double x = (i / maxAge) * w;
+      double colWidth = w / maxAge;
+
+      bool isYearLine = i % 12 == 0; 
+      canvas.drawLine(Offset(x, headerHeight), Offset(x, h), isYearLine ? heavyGridPaint : gridPaint);
+
+      if (i < maxAge) {
+        final rectBulan = Rect.fromLTWH(x, startYBoxes, colWidth, boxHeight);
+        canvas.drawRect(rectBulan, Paint()..color = Colors.white..style = PaintingStyle.fill);
+        canvas.drawRect(rectBulan, Paint()..color = Colors.black54..style = PaintingStyle.stroke..strokeWidth = 1);
+        final tpBulan = TextPainter(text: TextSpan(text: "$i", style: boldTextStyle), textDirection: TextDirection.ltr)..layout();
+        tpBulan.paint(canvas, Offset(x + (colWidth / 2) - (tpBulan.width / 2), startYBoxes + 6));
+
+        if (isBerat) {
+          final rectKeterangan = Rect.fromLTWH(x, startYBoxes + boxHeight, colWidth, boxHeight);
+          canvas.drawRect(rectKeterangan, Paint()..color = (i < 6) ? const Color(0xFFFFF9C4) : Colors.white..style = PaintingStyle.fill);
+          canvas.drawRect(rectKeterangan, Paint()..color = Colors.black54..style = PaintingStyle.stroke..strokeWidth = 1);
+        }
+      }
+    }
+
+    if (isBerat) {
+      double asiWidth = (6 / maxAge) * w;
+      final tpAsi = TextPainter(text: const TextSpan(text: "LULUS ASI EKSKLUSIF", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 10, color: Colors.orange, letterSpacing: 1.5)), textDirection: TextDirection.ltr)..layout();
+      tpAsi.paint(canvas, Offset((asiWidth / 2) - (tpAsi.width / 2), startYBoxes + boxHeight + 6));
+    }
+  }
+
+  void _drawText(Canvas canvas, String text, Offset offset, TextStyle style) {
+    final tp = TextPainter(text: TextSpan(text: text, style: style), textDirection: TextDirection.ltr)..layout();
+    tp.paint(canvas, offset);
+  }
+
+  void _drawKmsZones(Canvas canvas, double w, double h) {
+    double graphAreaHeight = h - headerHeight;
+
+    Offset getCoord(double month, double value) {
+      double x = (month / maxAge) * w;
+      double y = h - (((value - minValue) / (maxValue - minValue)) * graphAreaHeight);
+      return Offset(x, y);
+    }
+
+    List<Offset> linePlus3SD = [], linePlus2SD = [], lineMedian = [], lineMinus2SD = [], lineMinus3SD = [];
+
+    for (int month = 0; month <= maxAge; month++) {
+      double baseGrowth = isBerat ? 3.2 + (month * 0.4) - (month * month * 0.003) : 50.0 + (month * 1.5) - (month * month * 0.008); 
+      double sdVariance = isBerat ? (1.5 + (month * 0.03)) : (4.0 + (month * 0.1));
+
+      linePlus3SD.add(getCoord(month.toDouble(), baseGrowth + (sdVariance * 3)));
+      linePlus2SD.add(getCoord(month.toDouble(), baseGrowth + (sdVariance * 1.5)));
+      lineMedian.add(getCoord(month.toDouble(), baseGrowth));
+      lineMinus2SD.add(getCoord(month.toDouble(), baseGrowth - (sdVariance * 1.5)));
+      lineMinus3SD.add(getCoord(month.toDouble(), baseGrowth - (sdVariance * 2.5)));
+    }
+
+    void drawZone(List<Offset> topList, List<Offset> bottomList, Color color) {
+      final path = Path();
+      path.moveTo(topList.first.dx, topList.first.dy);
+      for (var point in topList) { path.lineTo(point.dx, point.dy); }
+      for (var point in bottomList.reversed) { path.lineTo(point.dx, point.dy); }
+      path.close();
+      canvas.drawPath(path, Paint()..color = color..style = PaintingStyle.fill);
+    }
+
+    drawZone(linePlus3SD, linePlus2SD, const Color(0xFFFFD54F)); 
+    drawZone(linePlus2SD, lineMedian, const Color(0xFF81C784));  
+    drawZone(lineMedian, lineMinus2SD, const Color(0xFF4CAF50)); 
+    drawZone(lineMinus2SD, lineMinus3SD, const Color(0xFFFFD54F));
+
+    final redPath = Path();
+    redPath.moveTo(lineMinus3SD.first.dx, lineMinus3SD.first.dy);
+    for (var point in lineMinus3SD) { redPath.lineTo(point.dx, point.dy); }
+    canvas.drawPath(redPath, Paint()..color = Colors.red..strokeWidth = 3.5..style = PaintingStyle.stroke);
+
+    if (lineMinus3SD.isNotEmpty && lineMinus3SD.length > 20) {
+      Offset bgmTextPos = lineMinus3SD[20]; 
+      canvas.save();
+      canvas.translate(bgmTextPos.dx, bgmTextPos.dy + 15);
+      canvas.rotate(-0.1);
+      _drawText(canvas, "BGM (Bawah Garis Merah)", const Offset(0, 0), const TextStyle(color: Colors.red, fontWeight: FontWeight.bold, fontSize: 11));
+      canvas.restore();
+    }
+  }
+
+  void _plotUserData(Canvas canvas, double w, double h) {
+    if (dataPoints.isEmpty) return;
+    double graphAreaHeight = h - headerHeight;
+
+    final linePaint = Paint()..color = Colors.black87..strokeWidth = 3..style = PaintingStyle.stroke;
+    final dotOutlinePaint = Paint()..color = Colors.white..style = PaintingStyle.fill;
+    final dotPaint = Paint()..color = Colors.black..style = PaintingStyle.fill;
+
+    final path = Path();
+    for (int i = 0; i < dataPoints.length; i++) {
+      double monthAge = dataPoints[i]['umur']!;
+      double val = dataPoints[i]['nilai']!;
+      double x = (monthAge / maxAge) * w;
+      double y = h - (((val - minValue) / (maxValue - minValue)) * graphAreaHeight);
+
+      if (i == 0) path.moveTo(x, y);
+      else path.lineTo(x, y);
+
+      canvas.drawCircle(Offset(x, y), 6, dotOutlinePaint); 
+      canvas.drawCircle(Offset(x, y), 4, dotPaint); 
+    }
+    canvas.drawPath(path, linePaint);
+  }
+
+  @override
+  bool shouldRepaint(covariant BukuKmsPainter oldDelegate) => true; 
+}

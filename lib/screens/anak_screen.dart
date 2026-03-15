@@ -1,8 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:kawantumbuh/screens/grafik_lengkap_screen.dart'; // Sesuaikan path jika berbeda
 import 'package:supabase_flutter/supabase_flutter.dart';
-import 'edit_identitas_anak_screen.dart';
-import 'catat_pertumbuhan_screen.dart';
-import 'daftar_anak_screen.dart';
+import 'edit_identitas_anak_screen.dart'; // Sesuaikan path jika berbeda
+import 'catat_pertumbuhan_screen.dart'; // Sesuaikan path jika berbeda
+import 'daftar_anak_screen.dart'; // Sesuaikan path jika berbeda
 import 'dart:math';
 
 class AnakScreen extends StatefulWidget {
@@ -18,12 +19,13 @@ class _AnakScreenState extends State<AnakScreen> {
   final Color softPink = const Color(0xFFFFEAEA); 
   final Color fieldPink = const Color(0xFFF5CBCB); 
   final Color highlightPink = const Color(0xFFEBA9A9); 
-  final Color successGreen = const Color(0xFFA5D6A7); 
+  final Color successGreen = const Color(0xFF4CAF50); 
   final Color brightPink = Colors.pinkAccent;
 
   bool isBeratBadan = true;
   int selectedIndex = 0;
   bool _isLoading = true;
+  int? _touchedIndex; 
   
   List<Map<String, dynamic>> _daftarAnak = [];
   List<Map<String, dynamic>> _riwayatPertumbuhan = [];
@@ -100,6 +102,7 @@ class _AnakScreenState extends State<AnakScreen> {
         setState(() {
           _riwayatPertumbuhan = List<Map<String, dynamic>>.from(dataRiwayat);
           _prediksiTerbaru = dataPrediksi.isNotEmpty ? dataPrediksi[0] : null;
+          _touchedIndex = null; 
           _isLoading = false;
         });
       }
@@ -112,10 +115,7 @@ class _AnakScreenState extends State<AnakScreen> {
   List<double> _getChartData() {
     if (_riwayatPertumbuhan.isEmpty) return [];
     
-    // FIX: Mengubah take(5) menjadi take(12) agar bisa menampilkan 1 tahun data
-    // Jangan hapus take sepenuhnya agar titik grafik tidak terlalu dempet jika data sudah bertahun-tahun
-    // Mengambil maksimal 60 data (5 tahun x 12 bulan)
-var recentData = _riwayatPertumbuhan.take(60).toList();
+    var recentData = _riwayatPertumbuhan.take(60).toList();
     recentData = recentData.reversed.toList(); 
 
     return recentData.map((e) {
@@ -173,7 +173,6 @@ var recentData = _riwayatPertumbuhan.take(60).toList();
     );
   }
 
-  // --- WIDGET ANALISIS & SARAN PINTAR ---
   Widget _buildStatusPertumbuhan(String name) {
     String rawStatus = _prediksiTerbaru?['status_gizi'] ?? "";
     
@@ -195,7 +194,7 @@ var recentData = _riwayatPertumbuhan.take(60).toList();
       pesan = "Berdasarkan tren grafik $name, AI memprediksi status gizinya bulan depan berpotensi mengarah ke: *$rawStatus*.\n\n";
 
       if (statusLower.contains("normal") || statusLower.contains("baik")) {
-        boxColor = successGreen;
+        boxColor = successGreen.withOpacity(0.6);
         iconData = Icons.check_circle_outline;
         pesan += "Saran untuk Bunda:\nWah, hebat Bun! Pertumbuhan $name sangat baik. Terus pertahankan asupan bergizi seimbangnya dan rutin ke Posyandu ya!";
       } else if (statusLower.contains("risiko") || statusLower.contains("lebih") || statusLower.contains("tinggi")) {
@@ -441,9 +440,9 @@ var recentData = _riwayatPertumbuhan.take(60).toList();
     );
   }
 
-  // --- WIDGET CHART DENGAN LABEL X DAN Y ---
   Widget _buildDynamicChartCard() {
     List<double> chartData = _getChartData();
+    final currentChild = _daftarAnak[selectedIndex];
 
     return Container(
       width: double.infinity,
@@ -461,80 +460,135 @@ var recentData = _riwayatPertumbuhan.take(60).toList();
           Text("Standar Pertumbuhan Kemenkes (KIA)", style: TextStyle(color: navyDark.withOpacity(0.5), fontSize: 11)),
           const SizedBox(height: 20),
           
-          // KETERANGAN SUMBU Y
           Row(
             children: [
-              Icon(Icons.arrow_upward, size: 12, color: navyDark.withOpacity(0.6)),
-              const SizedBox(width: 4),
+              Icon(Icons.arrow_upward, size: 14, color: navyDark.withOpacity(0.8)),
+              const SizedBox(width: 6),
               Text(
                 "Sumbu Y : ${isBeratBadan ? 'Nilai Berat (Kg)' : 'Nilai Tinggi (cm)'}", 
-                style: TextStyle(color: navyDark.withOpacity(0.7), fontSize: 11, fontWeight: FontWeight.bold)
+                style: TextStyle(color: navyDark, fontSize: 12, fontWeight: FontWeight.w700)
               ),
             ],
           ),
-          const SizedBox(height: 8),
+          const SizedBox(height: 12),
           
-          // AREA GRAFIK
-          Container(
-            padding: const EdgeInsets.only(left: 10, right: 10, bottom: 5),
-            decoration: BoxDecoration(
-              border: Border(
-                left: BorderSide(color: navyDark.withOpacity(0.3), width: 2), // Garis Sumbu Y
-                bottom: BorderSide(color: navyDark.withOpacity(0.3), width: 2), // Garis Sumbu X
-              )
-            ),
-            height: 200,
-            child: CustomPaint(
-              size: Size.infinite,
-              painter: DynamicChartPainter(navyDark, chartData, isBeratBadan),
-            ),
+          LayoutBuilder(
+            builder: (context, constraints) {
+              return GestureDetector(
+                onPanDown: (details) => _handleTouch(details.localPosition.dx, constraints.maxWidth, chartData.length),
+                onTapDown: (details) => _handleTouch(details.localPosition.dx, constraints.maxWidth, chartData.length),
+                child: Container(
+                  padding: const EdgeInsets.only(left: 10, right: 10, bottom: 5),
+                  decoration: BoxDecoration(
+                    border: Border(
+                      left: BorderSide(color: navyDark.withOpacity(0.5), width: 2.5), 
+                      bottom: BorderSide(color: navyDark.withOpacity(0.5), width: 2.5), 
+                    )
+                  ),
+                  height: 200,
+                  width: double.infinity,
+                  child: CustomPaint(
+                    size: Size.infinite,
+                    painter: DynamicChartPainter(navyDark, chartData, isBeratBadan, _touchedIndex),
+                  ),
+                ),
+              );
+            }
           ),
-          const SizedBox(height: 8),
+          const SizedBox(height: 12),
 
-          // KETERANGAN SUMBU X
           Row(
             mainAxisAlignment: MainAxisAlignment.end,
             children: [
               Text(
-                "Sumbu X : Waktu (Kiri: Terlama ➔ Kanan: Terbaru)", 
-                style: TextStyle(color: navyDark.withOpacity(0.7), fontSize: 11, fontWeight: FontWeight.bold)
+                "Sumbu X : Waktu (Kiri Lama ➔ Kanan Baru)", 
+                style: TextStyle(color: navyDark, fontSize: 12, fontWeight: FontWeight.w700)
               ),
-              const SizedBox(width: 4),
-              Icon(Icons.arrow_forward, size: 12, color: navyDark.withOpacity(0.6)),
+              const SizedBox(width: 6),
+              Icon(Icons.arrow_forward, size: 14, color: navyDark.withOpacity(0.8)),
             ],
           ),
 
-          const SizedBox(height: 20),
+          const SizedBox(height: 25),
           const Divider(),
-          const SizedBox(height: 10),
-          Text("Panduan Warna Grafik:", style: TextStyle(color: navyDark, fontWeight: FontWeight.bold, fontSize: 12)),
-          const SizedBox(height: 8),
-          Row(
+          const SizedBox(height: 15),
+          
+          Text("Panduan Warna Grafik:", style: TextStyle(color: navyDark, fontWeight: FontWeight.bold, fontSize: 13)),
+          const SizedBox(height: 12),
+          
+          Wrap(
+            spacing: 10, 
+            runSpacing: 10, 
             children: [
-              _buildLegendItem(const Color(0xFF4CAF50), "Hijau: Normal"),
-              const SizedBox(width: 15),
-              _buildLegendItem(const Color(0xFFFFEB3B), "Kuning: Waspada"),
+              SizedBox(width: 140, child: _buildLegendItem(const Color(0xFF4CAF50), "Hijau: Normal")),
+              SizedBox(width: 140, child: _buildLegendItem(const Color(0xFFFFEB3B), "Kuning: Waspada")),
+              SizedBox(width: 140, child: _buildLegendItem(const Color(0xFFF44336), "Merah: Konsultasi")),
+              SizedBox(width: 140, child: _buildLegendItem(navyDark, "Titik: Data Anak")),
             ],
           ),
-          const SizedBox(height: 5),
-          Row(
-            children: [
-              _buildLegendItem(const Color(0xFFF44336), "Merah: Konsultasi"),
-              const SizedBox(width: 15),
-              _buildLegendItem(navyDark, "Titik: Data Anak"),
-            ],
+          
+          const SizedBox(height: 20),
+          
+          // --- TOMBOL MENUJU HALAMAN GRAFIK LENGKAP ---
+          SizedBox(
+            width: double.infinity,
+            child: ElevatedButton.icon(
+              onPressed: () {
+                Navigator.push(
+                  context, 
+                  MaterialPageRoute(
+                    builder: (context) => GrafikLengkapScreen(
+                      riwayatData: _riwayatPertumbuhan,
+                      isBeratBadan: isBeratBadan,
+                      namaAnak: currentChild['nama'] ?? "Anak",
+                      tanggalLahir: currentChild['tanggal_lahir'] ?? "", 
+                      jenisKelamin: currentChild['jenis_kelamin'] ?? "Laki-laki", 
+                    )
+                  )
+                );
+              },
+              icon: Icon(Icons.insights, color: softPink),
+              label: Text(
+                "Lihat Detail Grafik Buku KIA", 
+                style: TextStyle(color: softPink, fontWeight: FontWeight.bold)
+              ),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: navyDark,
+                padding: const EdgeInsets.symmetric(vertical: 12),
+                elevation: 0,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(15),
+                ),
+              ),
+            ),
           ),
         ],
       ),
     );
   }
 
+  void _handleTouch(double dx, double maxWidth, int dataLength) {
+    if (dataLength <= 0) return;
+    double xStep = dataLength > 1 ? maxWidth / (dataLength - 1) : maxWidth / 2;
+    int index = (dx / xStep).round();
+    
+    if (index >= 0 && index < dataLength) {
+      setState(() {
+        _touchedIndex = index;
+      });
+    }
+  }
+
   Widget _buildLegendItem(Color color, String label) {
     return Row(
+      mainAxisSize: MainAxisSize.min,
       children: [
-        Container(width: 12, height: 12, decoration: BoxDecoration(color: color, shape: BoxShape.circle)),
-        const SizedBox(width: 6),
-        Text(label, style: TextStyle(fontSize: 11, color: navyDark.withOpacity(0.7))),
+        Container(
+          width: 14, height: 14, 
+          decoration: BoxDecoration(color: color, shape: BoxShape.circle, border: Border.all(color: Colors.black12, width: 0.5))
+        ),
+        const SizedBox(width: 8),
+        Text(label, style: TextStyle(fontSize: 12, color: navyDark, fontWeight: FontWeight.w500)),
       ],
     );
   }
@@ -589,7 +643,13 @@ var recentData = _riwayatPertumbuhan.take(60).toList();
               Text("TB: $tb", style: TextStyle(color: navyDark, fontWeight: FontWeight.bold)),
             ])
           ]),
-          Icon(Icons.check_circle, color: successGreen, size: 20),
+          Stack(
+            alignment: Alignment.center,
+            children: [
+              Container(width: 12, height: 12, decoration: const BoxDecoration(color: Colors.white, shape: BoxShape.circle)),
+              Icon(Icons.check_circle, color: Colors.green.shade600, size: 26),
+            ],
+          ),
         ],
       ),
     );
@@ -618,8 +678,9 @@ class DynamicChartPainter extends CustomPainter {
   final Color lineColor;
   final List<double> dataPoints;
   final bool isBerat;
+  final int? touchedIndex; 
 
-  DynamicChartPainter(this.lineColor, this.dataPoints, this.isBerat);
+  DynamicChartPainter(this.lineColor, this.dataPoints, this.isBerat, this.touchedIndex);
 
   @override
   void paint(Canvas canvas, Size size) {
@@ -648,16 +709,51 @@ class DynamicChartPainter extends CustomPainter {
     final path = Path();
     double xStep = dataPoints.length > 1 ? w / (dataPoints.length - 1) : w / 2;
 
+    List<Offset> pointOffsets = [];
+
     for (int i = 0; i < dataPoints.length; i++) {
       double x = dataPoints.length > 1 ? i * xStep : w / 2;
       double normalizedY = (dataPoints[i] - minVal) / (maxVal - minVal);
       double y = h - (normalizedY * h);
 
       if (i == 0) path.moveTo(x, y); else path.lineTo(x, y);
+      
+      pointOffsets.add(Offset(x, y));
+      
       canvas.drawCircle(Offset(x, y), 6, dotOutline);
       canvas.drawCircle(Offset(x, y), 4, dotPaint);
     }
     canvas.drawPath(path, paintLine);
+
+    if (touchedIndex != null && touchedIndex! >= 0 && touchedIndex! < dataPoints.length) {
+      final x = pointOffsets[touchedIndex!].dx;
+      final y = pointOffsets[touchedIndex!].dy;
+      final val = dataPoints[touchedIndex!];
+      
+      final textSpan = TextSpan(
+        text: "$val ${isBerat ? 'kg' : 'cm'}",
+        style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold),
+      );
+      final textPainter = TextPainter(text: textSpan, textDirection: TextDirection.ltr);
+      textPainter.layout();
+
+      final rectWidth = textPainter.width + 16;
+      final rectHeight = textPainter.height + 10;
+      double rectX = x - (rectWidth / 2);
+      if (rectX < 0) rectX = 0;
+      if (rectX + rectWidth > w) rectX = w - rectWidth;
+      
+      final rect = Rect.fromLTWH(rectX, y - rectHeight - 10, rectWidth, rectHeight);
+      
+      canvas.drawRRect(
+        RRect.fromRectAndRadius(rect, const Radius.circular(8)),
+        Paint()..color = lineColor,
+      );
+      
+      textPainter.paint(canvas, Offset(rectX + 8, y - rectHeight - 5));
+      
+      canvas.drawCircle(Offset(x, y), 8, Paint()..color = Colors.white..style = PaintingStyle.stroke..strokeWidth = 3);
+    }
   }
 
   void _drawCurvedZone(Canvas canvas, Size size, Color color, double top, double bottom) {
@@ -672,5 +768,7 @@ class DynamicChartPainter extends CustomPainter {
   }
 
   @override
-  bool shouldRepaint(covariant DynamicChartPainter oldDelegate) => true;
+  bool shouldRepaint(covariant DynamicChartPainter oldDelegate) {
+    return oldDelegate.touchedIndex != touchedIndex || oldDelegate.dataPoints != dataPoints;
+  }
 }
