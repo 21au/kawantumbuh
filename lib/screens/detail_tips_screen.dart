@@ -1,20 +1,20 @@
 import 'package:flutter/material.dart';
 
 class DetailTipsScreen extends StatelessWidget {
-  final Map<String, String> item;
+  // PERBAIKAN 1: Tipe data diubah menjadi dynamic
+  final Map<String, dynamic> item;
 
   const DetailTipsScreen({super.key, required this.item});
 
   @override
   Widget build(BuildContext context) {
-    // --- PALET WARNA UTAMA (Disamakan dengan layar sebelumnya) ---
+    // --- PALET WARNA UTAMA ---
     final Color navyDark = const Color(0xFF102C57);
     final Color softPink = const Color(0xFFFFEAEA); 
     final Color highlightPink = const Color(0xFFEBA9A9); 
 
     return Scaffold(
-      backgroundColor: softPink, // Background utama
-      // Gunakan AppBar sederhana agar tombol back selalu responsif
+      backgroundColor: softPink, 
       appBar: AppBar(
         backgroundColor: Colors.transparent,
         elevation: 0,
@@ -35,18 +35,44 @@ class DetailTipsScreen extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Gambar Utama dengan optimasi cache
-            Image.network(
-              item['imageUrl'] ?? '',
-              width: double.infinity,
-              height: 300,
-              fit: BoxFit.cover,
-              cacheWidth: 600, 
-              errorBuilder: (context, error, stackTrace) => Container(
-                height: 300,
-                color: highlightPink, // Pengganti warna abu-abu
-                child: Icon(Icons.image, size: 50, color: softPink),
-              ),
+            
+            // PERBAIKAN 2: Logika pintar untuk membedakan gambar internet & lokal
+            Builder(
+              builder: (context) {
+                String imagePath = item['imageUrl'] ?? '';
+                
+                // Jika gambar dari internet (URL)
+                if (imagePath.startsWith('http')) {
+                  return Image.network(
+                    imagePath,
+                    width: double.infinity,
+                    height: 300,
+                    fit: BoxFit.cover,
+                    errorBuilder: (context, error, stackTrace) => Container(
+                      height: 300, color: highlightPink,
+                      child: Icon(Icons.image, size: 50, color: softPink),
+                    ),
+                  );
+                } 
+                // Jika gambar dari aset folder lokal (Buku KIA)
+                else if (imagePath.isNotEmpty) {
+                  return Image.asset(
+                    imagePath,
+                    width: double.infinity,
+                    height: 300,
+                    fit: BoxFit.cover,
+                    errorBuilder: (context, error, stackTrace) => Container(
+                      height: 300, color: highlightPink,
+                      child: Icon(Icons.image_not_supported, size: 50, color: softPink),
+                    ),
+                  );
+                }
+                // Jika tidak ada gambar
+                return Container(
+                  height: 300, color: highlightPink,
+                  child: Icon(Icons.image, size: 50, color: softPink),
+                );
+              },
             ),
             
             Padding(
@@ -85,29 +111,30 @@ class DetailTipsScreen extends StatelessWidget {
                     padding: const EdgeInsets.symmetric(vertical: 20),
                     child: Divider(color: navyDark.withOpacity(0.2)),
                   ),
-                  // Teks Isi Artikel
-                  Text(
-                    item['desc'] ?? '',
-                    style: TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.w600,
-                      color: navyDark,
+                  
+                  // PERBAIKAN 3: Memanggil Teks dari Bank Data
+                  // Menampilkan deskripsi (kalau ada)
+                  if (item['desc'] != null)
+                    Text(
+                      item['desc'],
+                      style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.w600,
+                        color: navyDark,
+                      ),
                     ),
-                  ),
-                  const SizedBox(height: 15),
+                  if (item['desc'] != null) const SizedBox(height: 15),
+                  
+                  // Menampilkan isi artikel lengkap
                   Text(
-                    "Menjaga kesehatan buah hati adalah prioritas utama setiap orang tua. "
-                    "Pastikan Anda selalu berkonsultasi dengan tenaga medis profesional "
-                    "untuk mendapatkan penanganan yang sesuai dengan kebutuhan spesifik anak Anda.\n\n"
-                    "Langkah-langkah kecil yang dilakukan secara rutin akan memberikan dampak "
-                    "besar bagi pertumbuhan fisik dan mental si kecil di masa depan.",
+                    item['content'] ?? 'Konten belum tersedia.',
                     style: TextStyle(
                       fontSize: 16,
                       height: 1.6,
-                      color: navyDark.withOpacity(0.9), // Pengganti Colors.black87
+                      color: navyDark.withOpacity(0.9), 
                     ),
                   ),
-                  const SizedBox(height: 100), // Ruang agar tidak mentok bawah
+                  const SizedBox(height: 100), 
                 ],
               ),
             ),

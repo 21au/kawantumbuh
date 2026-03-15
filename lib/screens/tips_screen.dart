@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'detail_tips_screen.dart';
+import 'kia/data_edukasi.dart'; // Sesuaikan jika lokasi foldernya berbeda
 
 class TipsScreen extends StatelessWidget {
   const TipsScreen({super.key});
