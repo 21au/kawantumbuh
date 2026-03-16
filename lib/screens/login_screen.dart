@@ -1,8 +1,7 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
-import 'package:kawantumbuh/screens/main_wrapper.dart';
 import 'package:supabase_flutter/supabase_flutter.dart'; 
-import 'package:shared_preferences/shared_preferences.dart'; // <--- Import ini
+import 'package:shared_preferences/shared_preferences.dart';
+import 'main_wrapper.dart';
 import 'register_screen.dart';
 import 'forgot_password_screen.dart';
 
@@ -29,10 +28,9 @@ class _LoginScreenState extends State<LoginScreen> {
   @override
   void initState() {
     super.initState();
-    _loadSavedCredentials(); // <--- Cek apakah ada nomor yang pernah disimpan
+    _loadSavedCredentials();
   }
 
-  // FUNGSI 1: Mengambil nomor HP yang tersimpan saat aplikasi dibuka
   Future<void> _loadSavedCredentials() async {
     final prefs = await SharedPreferences.getInstance();
     setState(() {
@@ -41,8 +39,7 @@ class _LoginScreenState extends State<LoginScreen> {
     });
   }
 
-  // FUNGSI 2: Menyimpan atau menghapus nomor HP berdasarkan status checkbox
-  Future<void> _handleRememberMe() async {
+  Future<void> _saveCredentials() async {
     final prefs = await SharedPreferences.getInstance();
     if (_rememberMe) {
       await prefs.setString('saved_phone', _phoneController.text.trim());
@@ -54,45 +51,65 @@ class _LoginScreenState extends State<LoginScreen> {
   }
 
   Future<void> _login() async {
+    // 1. Validasi Input
     if (_phoneController.text.isEmpty || _passwordController.text.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("No HP dan Password harus diisi!"), backgroundColor: Colors.red),
-      );
+      _showSnackBar("No HP dan Password harus diisi!", Colors.red);
       return;
     }
 
     setState(() => _isLoading = true);
 
     try {
-      final phone = _phoneController.text.trim();
+      // 2. Normalisasi No HP (Menghapus spasi/karakter aneh)
+      final phone = _phoneController.text.trim().replaceAll(RegExp(r'[^0-9]'), '');
       final password = _passwordController.text.trim();
+      
+      // Sesuaikan dengan format email saat pendaftaran
       final ninjaEmail = '$phone@kawantumbuh.com';
 
+      // 3. Proses Auth
       await supabase.auth.signInWithPassword(
         email: ninjaEmail,
         password: password,
       );
 
-      // JIKA LOGIN BERHASIL, JALANKAN LOGIKA INGATKAN SAYA
-      await _handleRememberMe();
+      // 4. Simpan Remember Me
+      await _saveCredentials();
 
+      // 5. Navigasi (PASTIKAN MainWrapper tidak pakai const)
       if (mounted) {
-        Navigator.pushReplacement(
+        Navigator.pushAndRemoveUntil(
           context,
-          MaterialPageRoute(builder: (context) => const MainWrapper()), 
+          MaterialPageRoute(builder: (context) => MainWrapper()), // JANGAN PAKAI CONST
+          (route) => false, // Hapus semua halaman sebelumnya agar tidak bisa balik ke login
         );
       }
     } on AuthException catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text("Gagal masuk: ${e.message}"), backgroundColor: Colors.red),
-      );
+      // Error spesifik dari Supabase (Password salah, user tidak ada, dll)
+      String errorMsg = "Gagal masuk: Nomor atau password salah";
+      if (e.message.contains("Invalid login credentials")) {
+        errorMsg = "Nomor HP atau Password Bunda salah, cek lagi ya!";
+      } else if (e.message.contains("Email not confirmed")) {
+        errorMsg = "Akun belum dikonfirmasi.";
+      }
+      _showSnackBar(errorMsg, Colors.red);
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("Terjadi kesalahan sistem"), backgroundColor: Colors.red),
-      );
+      _showSnackBar("Terjadi kesalahan koneksi. Pastikan internet aktif.", Colors.red);
+      debugPrint("Login Error: $e");
     } finally {
       if (mounted) setState(() => _isLoading = false);
     }
+  }
+
+  void _showSnackBar(String message, Color color) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(message), 
+        backgroundColor: color,
+        behavior: SnackBarBehavior.floating, // Biar lebih cantik melayang
+      ),
+    );
   }
 
   @override
@@ -114,31 +131,25 @@ class _LoginScreenState extends State<LoginScreen> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 const SizedBox(height: 10),
-                Text(
-                  "Selamat Datang!",
-                  style: TextStyle(fontSize: 32, fontWeight: FontWeight.bold, color: navyDark),
-                ),
+                Text("Selamat Datang!", style: TextStyle(fontSize: 32, fontWeight: FontWeight.bold, color: navyDark)),
                 const SizedBox(height: 8),
-                Text(
-                  "Pantau tumbuh kembang si kecil dengan mudah.",
-                  style: TextStyle(fontSize: 15, color: navyDark.withOpacity(0.7)),
-                ),
+                Text("Pantau tumbuh kembang si kecil dengan mudah.", style: TextStyle(fontSize: 15, color: navyDark.withOpacity(0.7))),
                 const SizedBox(height: 40),
                 
                 _buildLabel("No HP/Whatsapp"),
                 _buildTextField(
-                  controller: _phoneController,
-                  hint: "08XXXXXXXXX",
-                  isNumber: true,
+                  controller: _phoneController, 
+                  hint: "Contoh: 08123456789", 
+                  isNumber: true
                 ),
                 
                 const SizedBox(height: 20),
                 
                 _buildLabel("Password"),
                 _buildTextField(
-                  controller: _passwordController,
-                  hint: "*********",
-                  isPassword: true,
+                  controller: _passwordController, 
+                  hint: "Masukkan password Bunda", 
+                  isPassword: true
                 ),
                 
                 const SizedBox(height: 15),
@@ -151,27 +162,21 @@ class _LoginScreenState extends State<LoginScreen> {
                       child: Row(
                         children: [
                           SizedBox(
-                            height: 30, width: 30,
-                            child: Transform.scale(
-                              scale: 1.3, 
-                              child: Checkbox(
-                                value: _rememberMe,
-                                activeColor: navyDark, 
-                                checkColor: Colors.white,
-                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(4)),
-                                side: BorderSide(color: navyDark.withOpacity(0.6), width: 1.5),
-                                onChanged: (value) => setState(() => _rememberMe = value!),
-                              ),
+                            width: 24,
+                            child: Checkbox(
+                              value: _rememberMe,
+                              activeColor: navyDark,
+                              onChanged: (value) => setState(() => _rememberMe = value!),
                             ),
                           ),
-                          const SizedBox(width: 10),
-                          Text("Ingatkan Saya", style: TextStyle(color: navyDark, fontSize: 14, fontWeight: FontWeight.w500)),
+                          const SizedBox(width: 8),
+                          Text("Ingatkan Saya", style: TextStyle(color: navyDark, fontWeight: FontWeight.w500)),
                         ],
                       ),
                     ),
                     TextButton(
                       onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (context) => const ForgotPasswordScreen())),
-                      child: Text("Lupa password ?", style: TextStyle(color: navyDark, fontWeight: FontWeight.bold, fontSize: 14)),
+                      child: Text("Lupa password ?", style: TextStyle(color: navyDark, fontWeight: FontWeight.bold)),
                     ),
                   ],
                 ),
@@ -184,11 +189,16 @@ class _LoginScreenState extends State<LoginScreen> {
                   child: ElevatedButton(
                     onPressed: _isLoading ? null : _login, 
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: navyDark,
+                      backgroundColor: navyDark, 
                       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
+                      disabledBackgroundColor: navyDark.withOpacity(0.6),
                     ),
                     child: _isLoading
-                        ? const SizedBox(height: 24, width: 24, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 3))
+                        ? const SizedBox(
+                            height: 20, 
+                            width: 20, 
+                            child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2)
+                          )
                         : const Text("Masuk", style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold)),
                   ),
                 ),
@@ -203,8 +213,8 @@ class _LoginScreenState extends State<LoginScreen> {
                         style: TextStyle(color: navyDark.withOpacity(0.7), fontSize: 14),
                         children: [
                           TextSpan(
-                            text: "Daftar disini",
-                            style: TextStyle(color: navyDark, fontWeight: FontWeight.bold, decoration: TextDecoration.underline),
+                            text: "Daftar disini", 
+                            style: TextStyle(color: navyDark, fontWeight: FontWeight.bold, decoration: TextDecoration.underline)
                           ),
                         ],
                       ),
@@ -219,6 +229,7 @@ class _LoginScreenState extends State<LoginScreen> {
     );
   }
 
+  // --- WIDGET HELPER ---
   Widget _buildLabel(String text) {
     return Padding(
       padding: const EdgeInsets.only(bottom: 8.0, left: 4.0),
@@ -226,22 +237,17 @@ class _LoginScreenState extends State<LoginScreen> {
     );
   }
 
-  Widget _buildTextField({
-    required TextEditingController controller,
-    required String hint,
-    bool isPassword = false,
-    bool isNumber = false,
-  }) {
+  Widget _buildTextField({required TextEditingController controller, required String hint, bool isPassword = false, bool isNumber = false}) {
     return Container(
       decoration: BoxDecoration(color: fieldColor, borderRadius: BorderRadius.circular(15)),
       child: TextField(
         controller: controller,
         obscureText: isPassword ? _obscureText : false,
         keyboardType: isNumber ? TextInputType.number : TextInputType.text,
-        style: TextStyle(color: navyDark, fontSize: 15, fontWeight: FontWeight.w500),
+        style: TextStyle(color: navyDark),
         decoration: InputDecoration(
           hintText: hint,
-          hintStyle: TextStyle(color: navyDark.withOpacity(0.4), fontSize: 14),
+          hintStyle: TextStyle(color: navyDark.withOpacity(0.4)),
           border: InputBorder.none,
           contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 18),
           suffixIcon: isPassword 

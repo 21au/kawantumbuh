@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
-import 'dart:math'; // Tambahan untuk menghitung nilai max/min di grafik
+import 'dart:math'; // Untuk menghitung nilai max/min di grafik
 
 class StatistikPertumbuhanScreen extends StatefulWidget {
   final String anakId;
@@ -69,7 +69,7 @@ class _StatistikPertumbuhanScreenState extends State<StatistikPertumbuhanScreen>
   void _tentukanKesimpulan() {
     if (_riwayat.isEmpty) {
       _jenisKesimpulan = "Belum Ada Data";
-      _kesimpulan = "Belum ada data pengukuran, Bun. Yuk catat data pertama ${widget.namaAnak} supaya kita bisa pantau tumbuh kembangnya bersama! 💕";
+      _kesimpulan = "Halo Bunda! Belum ada data ukuran nih. Yuk catat data pertama ${widget.namaAnak} supaya kita bisa pantau tumbuh kembangnya sama-sama! 💕";
       return;
     }
 
@@ -84,19 +84,19 @@ class _StatistikPertumbuhanScreenState extends State<StatistikPertumbuhanScreen>
       String statusGizi = prediksiBB['status_gizi'] ?? "Normal";
       double nilaiPrediksi = double.tryParse(prediksiBB['nilai_prediksi'].toString()) ?? 0.0;
       
-      _jenisKesimpulan = "Analisis AI: $statusGizi";
+      _jenisKesimpulan = "Pantauan Gizi: $statusGizi";
       
       if (statusGizi.toLowerCase().contains('normal') || statusGizi.toLowerCase().contains('baik')) {
-        _kesimpulan = "Berdasarkan Z-Score WHO, pertumbuhan ${widget.namaAnak} sangat baik! AI memprediksi bulan depan beratnya sekitar ${nilaiPrediksi.toStringAsFixed(1)} kg. Terus pertahankan asupan nutrisinya ya, Bun! 💖";
+        _kesimpulan = "Berdasarkan grafik WHO, pertumbuhan ${widget.namaAnak} sangat baik lho, Bun! Berdasarkan pola saat ini, bulan depan beratnya kemungkinan bisa sekitar ${nilaiPrediksi.toStringAsFixed(1)} kg. Pertahankan asupan nutrisi bergizinya ya! 💖";
       } else {
-        _kesimpulan = "Sistem mendeteksi indikasi $statusGizi. AI memprediksi berat bulan depan sekitar ${nilaiPrediksi.toStringAsFixed(1)} kg. Jangan panik ya Bun, yuk pantau ekstra dan konsultasikan dengan dokter anak agar penanganannya tepat. Peluk hangat untuk Bunda! 🫂";
+        _kesimpulan = "Dari catatan ini, sepertinya ada indikasi $statusGizi. Berdasarkan tren yang ada, perkiraan berat bulan depan sekitar ${nilaiPrediksi.toStringAsFixed(1)} kg. Jangan panik dulu ya Bun, mari pantau ekstra dan jadwalkan konsultasi dengan bidan atau dokter anak agar penanganannya tepat. Peluk hangat untuk Bunda! 🫂";
       }
       return; 
     }
 
     if (_riwayat.length == 1) {
       _jenisKesimpulan = "Awal yang Baik";
-      _kesimpulan = "Data pertama ${widget.namaAnak} sudah tercatat! Terus pantau dan catat pertumbuhannya bulan depan untuk melihat trennya ya. Bunda hebat! 💖";
+      _kesimpulan = "Wah, data pertama ${widget.namaAnak} sudah masuk! Terus pantau dan catat ya Bun tiap bulannya untuk melihat grafiknya. Bunda pasti bisa! 💖";
       return;
     }
 
@@ -106,19 +106,19 @@ class _StatistikPertumbuhanScreenState extends State<StatistikPertumbuhanScreen>
 
     if (selisihBB < 0) {
       _jenisKesimpulan = "Berat Badan Turun";
-      _kesimpulan = "Bulan ini grafik ${widget.namaAnak} sedikit menurun. Tidak apa-apa Bun, wajar jika anak kadang susah makan atau sedang aktif-aktifnya. Jangan terlalu keras pada diri sendiri ya. Coba tawarkan cemilan padat gizi pelan-pelan. Bunda tidak sendirian! 🫂";
+      _kesimpulan = "Bulan ini grafik ${widget.namaAnak} sedikit menurun nih. Wajar kok Bun, anak kadang susah makan atau sedang aktif-aktifnya bergerak. Jangan terlalu stres ya. Coba tawarkan cemilan padat gizi pelan-pelan. Bunda tidak sendirian! 🫂";
     } else if (selisihBB >= 1.0) {
       _jenisKesimpulan = "Naik Signifikan";
-      _kesimpulan = "Wah, bulan ini ${widget.namaAnak} melesat pertumbuhannya! Pastikan kenaikannya tetap nyaman untuknya ya Bun. Jika Bunda merasa ragu, konsultasi santai dengan dokter anak bisa jadi pilihan. Semangat terus, Bunda hebat! 🚀";
+      _kesimpulan = "Wah, bulan ini ${widget.namaAnak} melesat pertumbuhannya! Pastikan badannya tetap nyaman ya Bun. Jika Bunda merasa ragu, ngobrol santai dengan bidan atau dokter anak bisa jadi pilihan. Semangat terus! 🚀";
     } else if (bbSekarang < 5.0) { 
-      _jenisKesimpulan = "Perlu Perhatian (Underweight)";
-      _kesimpulan = "Grafik ${widget.namaAnak} sedang sedikit di bawah rata-rata. Jangan khawatir atau berkecil hati ya, Bun, setiap anak punya prosesnya sendiri. Yuk, coba pelan-pelan tingkatkan kalori dari makanan kesukaannya. Peluk hangat untuk Bunda! ✨";
+      _jenisKesimpulan = "Perlu Perhatian Khusus";
+      _kesimpulan = "Grafik ${widget.namaAnak} sedang sedikit di bawah garis. Jangan khawatir atau berkecil hati ya, Bun, setiap anak punya prosesnya sendiri. Yuk, coba pelan-pelan tingkatkan porsi makanannya. Peluk hangat untuk Bunda! ✨";
     } else if (bbSekarang > 18.0) { 
-      _jenisKesimpulan = "Di Atas Rata-rata (Overweight)";
-      _kesimpulan = "${widget.namaAnak} tumbuh dengan sangat antusias! Grafiknya sedikit di atas rata-rata. Tidak perlu panik ya Bun, cukup seimbangkan dengan aktivitas fisik yang menyenangkan. Bunda pasti bisa! 🤸‍♀️";
+      _jenisKesimpulan = "Pertumbuhan Sangat Aktif";
+      _kesimpulan = "${widget.namaAnak} tumbuh dengan sangat antusias! Grafiknya sedikit di atas rata-rata. Tidak perlu panik ya Bun, cukup seimbangkan dengan aktivitas fisik yang menyenangkan. Bunda hebat! 🤸‍♀️";
     } else {
-      _jenisKesimpulan = "Pertumbuhan Normal";
-      _kesimpulan = "Wah, pertumbuhan ${widget.namaAnak} sangat baik dan stabil di jalur aman. Terus pertahankan asupan nutrisi seimbangnya ya, Bunda. Bunda sudah melakukan yang terbaik! 💖";
+      _jenisKesimpulan = "Pertumbuhan Normal & Aman";
+      _kesimpulan = "Alhamdulillah, pertumbuhan ${widget.namaAnak} sangat baik dan stabil di jalur aman. Terus pertahankan asupan nutrisi seimbangnya ya, Bunda. Bunda sudah melakukan yang terbaik! 💖";
     }
   }
 
@@ -167,7 +167,7 @@ class _StatistikPertumbuhanScreenState extends State<StatistikPertumbuhanScreen>
           const SizedBox(width: 15),
           Expanded(
             child: Text(
-              "Grafik di bawah menunjukkan tren pertumbuhan ${widget.namaAnak} berdasarkan data yang Bunda catat.",
+              "Grafik di bawah ini menunjukkan alur pertumbuhan ${widget.namaAnak} berdasarkan catatan yang Bunda masukkan tiap bulannya.",
               style: TextStyle(fontSize: 13, color: navyDark.withOpacity(0.8), height: 1.4),
             ),
           ),
@@ -210,9 +210,9 @@ class _StatistikPertumbuhanScreenState extends State<StatistikPertumbuhanScreen>
   }
 
   Widget _buildChartContainer(String title, bool isBerat) {
-    List<double> dataPoints = [];
+    List<double> historyPoints = [];
     if (_riwayat.isNotEmpty) {
-      dataPoints = _riwayat.map<double>((r) {
+      historyPoints = _riwayat.map<double>((r) {
         final val = r[isBerat ? 'berat_badan' : 'tinggi_badan'];
         return (val ?? 0).toDouble();
       }).toList();
@@ -220,8 +220,10 @@ class _StatistikPertumbuhanScreenState extends State<StatistikPertumbuhanScreen>
 
     String targetMetrik = isBerat ? 'berat_badan' : 'tinggi_badan';
     Map<String, dynamic>? prediksiAktif;
+    double? predictionValue;
     try {
       prediksiAktif = _listPrediksi.firstWhere((p) => p['metrik'] == targetMetrik);
+      predictionValue = double.tryParse(prediksiAktif['nilai_prediksi'].toString());
     } catch (e) {
       prediksiAktif = null;
     }
@@ -252,7 +254,7 @@ class _StatistikPertumbuhanScreenState extends State<StatistikPertumbuhanScreen>
           ),
           const SizedBox(height: 10),
 
-          if (dataPoints.isEmpty)
+          if (historyPoints.isEmpty)
              SizedBox(
                height: 150,
                child: Center(child: Text("Belum ada data grafik", style: TextStyle(color: navyDark.withOpacity(0.5)))),
@@ -269,11 +271,13 @@ class _StatistikPertumbuhanScreenState extends State<StatistikPertumbuhanScreen>
                height: 180,
                width: double.infinity,
                child: CustomPaint(
-                 painter: SimpleLineChartPainter(
-                   dataPoints: dataPoints,
+                 painter: PertumbuhanChartPainter(
+                   historyPoints: historyPoints,
+                   predictionPoint: predictionValue,
                    lineColor: navyDark,
                    dotColor: softPink,
-                   isBerat: isBerat, // Lempar status berat/tinggi untuk hitung min-max
+                   predictColor: brightPink,
+                   isBerat: isBerat, 
                  ),
                ),
              ),
@@ -293,18 +297,18 @@ class _StatistikPertumbuhanScreenState extends State<StatistikPertumbuhanScreen>
             ],
           ),
 
-          if (prediksiAktif != null) ...[
+          if (prediksiAktif != null && predictionValue != null) ...[
             const SizedBox(height: 20),
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 15, vertical: 12),
               decoration: BoxDecoration(color: softPink, borderRadius: BorderRadius.circular(15)),
               child: Row(
                 children: [
-                  Icon(Icons.auto_awesome, color: brightPink, size: 18),
+                  Icon(Icons.child_care_rounded, color: brightPink, size: 18),
                   const SizedBox(width: 10),
                   Expanded(
                     child: Text(
-                      "Berdasarkan AI, bulan depan diprediksi menyentuh angka ${double.tryParse(prediksiAktif['nilai_prediksi'].toString())?.toStringAsFixed(1) ?? '-'} ${isBerat ? 'kg' : 'cm'}", 
+                      "Melihat tren pertumbuhannya, bulan depan diperkirakan bisa menyentuh angka ${predictionValue.toStringAsFixed(1)} ${isBerat ? 'kg' : 'cm'} nih, Bun.", 
                       style: TextStyle(color: navyDark, fontSize: 12, fontWeight: FontWeight.bold)
                     ),
                   ),
@@ -312,9 +316,9 @@ class _StatistikPertumbuhanScreenState extends State<StatistikPertumbuhanScreen>
               ),
             ),
             
-            const SizedBox(height: 10), // Jarak kecil antara kotak AI dan teks catatan
+            const SizedBox(height: 10), 
             
-            // --- TAMBAHAN DISCLAIMER MEDIS DI SINI ---
+            // --- DISCLAIMER MEDIS (Lebih Ramah) ---
             Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
@@ -322,7 +326,7 @@ class _StatistikPertumbuhanScreenState extends State<StatistikPertumbuhanScreen>
                 const SizedBox(width: 6),
                 Expanded(
                   child: Text(
-                    "*Catatan: Angka ini adalah estimasi sistem berdasarkan tren grafik sebelumnya. Tetap jadikan dokter anak sebagai rujukan utama ya, Bun.",
+                    "*Catatan: Titik merah muda putus-putus pada grafik adalah perkiraan kasar dari alur bulan-bulan sebelumnya ya, Bun. Untuk memastikan kondisi pastinya, tetap jadikan bidan atau dokter anak sebagai rujukan utama.",
                     style: TextStyle(
                       color: navyDark.withOpacity(0.7), 
                       fontSize: 11, 
@@ -340,61 +344,118 @@ class _StatistikPertumbuhanScreenState extends State<StatistikPertumbuhanScreen>
   }
 }
 
-// --- CLASS UNTUK MENGGAMBAR GRAFIK GARIS OTOMATIS ---
-class SimpleLineChartPainter extends CustomPainter {
-  final List<double> dataPoints;
+// --- CLASS UNTUK MENGGAMBAR GRAFIK GARIS & PREDIKSI ---
+class PertumbuhanChartPainter extends CustomPainter {
+  final List<double> historyPoints;
+  final double? predictionPoint;
   final Color lineColor;
   final Color dotColor;
+  final Color predictColor;
   final bool isBerat;
 
-  SimpleLineChartPainter({required this.dataPoints, required this.lineColor, required this.dotColor, required this.isBerat});
+  PertumbuhanChartPainter({
+    required this.historyPoints, 
+    this.predictionPoint, 
+    required this.lineColor, 
+    required this.dotColor, 
+    required this.predictColor,
+    required this.isBerat
+  });
 
   @override
   void paint(Canvas canvas, Size size) {
-    if (dataPoints.isEmpty) return;
+    if (historyPoints.isEmpty) return;
 
-    // Hitung dinamis agar grafik tidak flat/menggantung di atas
-    double dataMax = dataPoints.reduce(max);
-    double dataMin = dataPoints.reduce(min);
+    // Gabungkan data historis dan prediksi untuk mencari skala (min & max)
+    List<double> allPoints = List.from(historyPoints);
+    if (predictionPoint != null) {
+      allPoints.add(predictionPoint!);
+    }
+
+    double dataMax = allPoints.reduce(max);
+    double dataMin = allPoints.reduce(min);
     
     final double gap = isBerat ? 3.0 : 10.0; 
     final double maxVal = dataMax + gap; 
     final double minVal = (dataMin - gap).clamp(0, double.infinity);
 
-    final paintLine = Paint()
+    final int totalPoints = allPoints.length;
+    final double stepX = totalPoints > 1 ? size.width / (totalPoints - 1) : size.width / 2;
+
+    List<Offset> points = [];
+
+    // Hitung kordinat setiap titik
+    for (int i = 0; i < totalPoints; i++) {
+      double x = totalPoints == 1 ? size.width / 2 : i * stepX;
+      double y = size.height - ((allPoints[i] - minVal) / (maxVal - minVal) * size.height);
+      points.add(Offset(x, y));
+    }
+
+    // 1. Gambar Garis Historis (Biru Navy Solid)
+    final paintHistoryLine = Paint()
       ..color = lineColor
       ..strokeWidth = 3.0
       ..style = PaintingStyle.stroke
       ..strokeJoin = StrokeJoin.round;
 
-    final paintDotOuter = Paint()..color = lineColor..style = PaintingStyle.fill;
-    final paintDotInner = Paint()..color = dotColor..style = PaintingStyle.fill;
-
-    final path = Path();
-    final double stepX = dataPoints.length > 1 ? size.width / (dataPoints.length - 1) : size.width / 2;
-
-    List<Offset> points = [];
-
-    for (int i = 0; i < dataPoints.length; i++) {
-      double x = dataPoints.length == 1 ? size.width / 2 : i * stepX;
-      double y = size.height - ((dataPoints[i] - minVal) / (maxVal - minVal) * size.height);
-      points.add(Offset(x, y));
-
+    final historyPath = Path();
+    for (int i = 0; i < historyPoints.length; i++) {
       if (i == 0) {
-        path.moveTo(x, y);
+        historyPath.moveTo(points[i].dx, points[i].dy);
       } else {
-        path.lineTo(x, y);
+        historyPath.lineTo(points[i].dx, points[i].dy);
       }
     }
-
-    if (dataPoints.length > 1) {
-      canvas.drawPath(path, paintLine);
+    if (historyPoints.length > 1) {
+      canvas.drawPath(historyPath, paintHistoryLine);
     }
 
-    // Gambar titik
-    for (var point in points) {
-      canvas.drawCircle(point, 6, paintDotOuter);
-      canvas.drawCircle(point, 3, paintDotInner);
+    // 2. Gambar Garis Prediksi (Pink Putus-putus)
+    if (predictionPoint != null && historyPoints.isNotEmpty) {
+      final paintPredictLine = Paint()
+        ..color = predictColor
+        ..strokeWidth = 2.5
+        ..style = PaintingStyle.stroke
+        ..strokeCap = StrokeCap.round;
+
+      Offset startPoint = points[historyPoints.length - 1];
+      Offset endPoint = points.last;
+
+      _drawDashedLine(canvas, startPoint, endPoint, paintPredictLine);
+    }
+
+    // 3. Gambar Titik-Titiknya
+    final paintDotOuter = Paint()..style = PaintingStyle.fill;
+    final paintDotInner = Paint()..color = dotColor..style = PaintingStyle.fill;
+
+    for (int i = 0; i < totalPoints; i++) {
+      bool isPredictionDot = (predictionPoint != null && i == totalPoints - 1);
+      
+      paintDotOuter.color = isPredictionDot ? predictColor : lineColor;
+      
+      canvas.drawCircle(points[i], isPredictionDot ? 7 : 6, paintDotOuter);
+      canvas.drawCircle(points[i], 3, paintDotInner);
+    }
+  }
+
+  // Fungsi tambahan untuk membuat garis putus-putus (dashed line)
+  void _drawDashedLine(Canvas canvas, Offset p1, Offset p2, Paint paint) {
+    const double dashWidth = 6;
+    const double dashSpace = 4;
+    double distance = (p2 - p1).distance;
+    double dx = (p2.dx - p1.dx) / distance;
+    double dy = (p2.dy - p1.dy) / distance;
+    double start = 0;
+
+    while (start < distance) {
+      double end = start + dashWidth;
+      if (end > distance) end = distance;
+      canvas.drawLine(
+        Offset(p1.dx + dx * start, p1.dy + dy * start),
+        Offset(p1.dx + dx * end, p1.dy + dy * end),
+        paint,
+      );
+      start += dashWidth + dashSpace;
     }
   }
 

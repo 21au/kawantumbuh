@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'dashboard_screen.dart';
-import 'anak_screen.dart';
+import 'anak_screen.dart'; // File Anak Bunda yang baru
 import 'tips_screen.dart';
 import 'profile_screen.dart';
 
@@ -12,133 +12,115 @@ class MainWrapper extends StatefulWidget {
 }
 
 class _MainWrapperState extends State<MainWrapper> {
-  int _currentIndex = 0;
+  // Variabel penentu halaman mana yang aktif
+  int _selectedIndex = 0;
 
-  // --- PALET WARNA UTAMA BUNDA ---
+  // Palette warna agar serasi dengan AnakScreen Bunda
   final Color navyDark = const Color(0xFF102C57);
   final Color softPink = const Color(0xFFFFEAEA);
-  final Color highlightPink = const Color(0xFFEBA9A9);
 
-  // Fungsi untuk berpindah tab yang bisa dipanggil dari child widget
-  void _navigateToTab(int index) {
+  // List halaman yang akan ditampilkan
+  late final List<Widget> _screens;
+
+  @override
+  void initState() {
+    super.initState();
+    _screens = [
+      DashboardScreen(
+        onNavigateToTips: () {
+          setState(() {
+            _selectedIndex = 2; // Sekarang Tips ada di Index 2
+          });
+        },
+      ),
+      const AnakScreen(),    // Index 1 (Kalkulator/Grafik Bunda)
+      const TipsScreen(),    // Index 2
+      const ProfileScreen(), // Index 3
+    ];
+  }
+
+  void _onItemTapped(int index) {
     setState(() {
-      _currentIndex = index;
+      _selectedIndex = index;
     });
   }
 
   @override
   Widget build(BuildContext context) {
-    // Daftar halaman diletakkan di dalam build agar bisa mengirimkan fungsi _navigateToTab
-    final List<Widget> pages = [
-      DashboardScreen(
-        onNavigateToTips: () => _navigateToTab(2), // Index 2 adalah TipsScreen
-      ),
-      const AnakScreen(),
-      const TipsScreen(),
-      const ProfileScreen(),
-    ];
-
     return Scaffold(
+      // Agar background warna halaman mengalir sampai ke bawah navbar
       extendBody: true, 
       body: IndexedStack(
-        index: _currentIndex,
-        children: pages,
+        index: _selectedIndex,
+        children: _screens,
       ),
 
-      // --- TOMBOL CHAT MELAYANG (FAB) ---
-      floatingActionButton: FloatingActionButton(
-        onPressed: () {
-          // Aksi Chat Konsultasi
-        },
-        backgroundColor: highlightPink,
-        shape: const CircleBorder(),
-        elevation: 4,
-        child: Icon(Icons.chat_bubble_rounded, color: navyDark, size: 28),
-      ),
+      // TOMBOL TENGAH (CHAT/ADD)
       floatingActionButtonLocation: FloatingActionButtonLocation.centerDocked,
+      floatingActionButton: Container(
+        height: 65,
+        width: 65,
+        margin: const EdgeInsets.only(top: 10),
+        child: FloatingActionButton(
+          backgroundColor: const Color(0xFFF5CBCB), // Mengikuti warna fieldPink Bunda
+          elevation: 4,
+          shape: const CircleBorder(),
+          onPressed: () {
+            // Aksi tombol tengah, misalnya buka konsultasi admin
+          },
+          child: Icon(Icons.chat_bubble_rounded, color: navyDark, size: 28),
+        ),
+      ),
 
-      bottomNavigationBar: _buildBottomNav(),
-    );
-  }
-
-  // --- BOTTOM NAVIGATION BAR ---
-  Widget _buildBottomNav() {
-    return BottomAppBar(
-      color: navyDark,
-      clipBehavior: Clip.antiAlias,
-      shape: const CircularNotchedRectangle(),
-      notchMargin: 8.0,
-      elevation: 0,
-      child: SizedBox(
-        height: 65, 
+      // NAVBAR MELENGKUNG (CUSTOM)
+      bottomNavigationBar: BottomAppBar(
+        height: 70,
+        color: navyDark,
+        shape: const CircularNotchedRectangle(), // Membuat lekukan
+        notchMargin: 10, // Jarak lekukan dengan tombol
         child: Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            Expanded(
-              child: Row(
-                children: [
-                  _buildNavItem(Icons.home_outlined, Icons.home, "Home", 0),
-                  _buildNavItem(Icons.child_care_outlined, Icons.child_care, "Anak", 1),
-                ],
-              ),
-            ),
+            // Sisi Kiri
+            _buildNavItem(Icons.home_rounded, "Home", 0),
+            _buildNavItem(Icons.calculate_outlined, "Anak", 1),
             
-            const SizedBox(width: 48), 
-
-            Expanded(
-              child: Row(
-                children: [
-                  _buildNavItem(Icons.lightbulb_outline, Icons.lightbulb, "Tips", 2),
-                  _buildNavItem(Icons.person_outline, Icons.person, "Profil", 3),
-                ],
-              ),
-            ),
+            // Ruang kosong untuk lekukan tombol tengah
+            const SizedBox(width: 40),
+            
+            // Sisi Kanan
+            _buildNavItem(Icons.bookmark_outline_rounded, "Tips", 2),
+            _buildNavItem(Icons.person_outline_rounded, "Profil", 3),
           ],
         ),
       ),
     );
   }
 
-  Widget _buildNavItem(IconData inactiveIcon, IconData activeIcon, String label, int index) {
-    bool isActive = _currentIndex == index;
-
-    return Expanded(
-      child: GestureDetector(
-        behavior: HitTestBehavior.opaque, 
-        onTap: () => _navigateToTab(index), // Menggunakan fungsi helper
-        child: AnimatedContainer(
-          duration: const Duration(milliseconds: 300),
-          curve: Curves.easeOutBack, 
-          transform: Matrix4.translationValues(0, isActive ? -6 : 0, 0),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              AnimatedSwitcher(
-                duration: const Duration(milliseconds: 300),
-                transitionBuilder: (child, animation) {
-                  return ScaleTransition(scale: animation, child: child);
-                },
-                child: Icon(
-                  isActive ? activeIcon : inactiveIcon,
-                  key: ValueKey<bool>(isActive), 
-                  color: isActive ? highlightPink : softPink, 
-                  size: isActive ? 28 : 24, 
-                ),
-              ),
-              const SizedBox(height: 4),
-              AnimatedDefaultTextStyle(
-                duration: const Duration(milliseconds: 300),
-                style: TextStyle(
-                  color: isActive ? highlightPink : softPink, 
-                  fontSize: isActive ? 11 : 10, 
-                  fontWeight: isActive ? FontWeight.bold : FontWeight.normal,
-                ),
-                child: Text(label),
-              ),
-            ],
+  // Fungsi helper untuk membuat tombol navigasi agar kode rapi
+  Widget _buildNavItem(IconData icon, String label, int index) {
+    bool isActive = _selectedIndex == index;
+    return GestureDetector(
+      onTap: () => _onItemTapped(index),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(
+            icon,
+            color: isActive ? softPink : Colors.white60,
+            size: 26,
           ),
-        ),
+          const SizedBox(height: 4),
+          Text(
+            label,
+            style: TextStyle(
+              color: isActive ? softPink : Colors.white60,
+              fontSize: 11,
+              fontWeight: isActive ? FontWeight.bold : FontWeight.normal,
+            ),
+          ),
+        ],
       ),
     );
   }

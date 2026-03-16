@@ -31,9 +31,9 @@ class _CatatPertumbuhanScreenState extends State<CatatPertumbuhanScreen> {
   @override
   void initState() {
     super.initState();
-    _beratController = TextEditingController(text: "80.0");
-    _tinggiController = TextEditingController(text: "80.0");
-    _lingkarController = TextEditingController(text: "80.0");
+    _beratController = TextEditingController(text: "40.0");
+    _tinggiController = TextEditingController(text: "60.0");
+    _lingkarController = TextEditingController(text: "45.0");
   }
 
   @override

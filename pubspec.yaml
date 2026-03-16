@@ -70,7 +70,13 @@ flutter:
   # the material Icons class.
   uses-material-design: true
   assets:
+    - assets/images/tidur.jpeg
     - assets/images/logo.png
+    - assets/images/mainan.png
+    - assets/images/mandi.png
+    - assets/images/tantrum.jpeg
+    - assets/images/demam.jpg
+    - assets/images/mpasi.jpeg
 
   # To add assets to your application, add an assets section, like this:
   # assets:
