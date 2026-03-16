@@ -34,7 +34,7 @@ class _TipsScreenState extends State<TipsScreen> {
       "title": "10 Makanan Terbaik", 
       "desc": "Nutrisi lengkap untuk anak.", 
       "time": "5 mnt",
-      "imageUrl": "https://images.unsplash.com/photo-1550583724-b2692b85b150?w=200",
+      "imageUrl": "assets/images/makanan.jpeg",
       "targetScreen": const MakananTerbaikScreen(), 
     },
     {
@@ -42,7 +42,7 @@ class _TipsScreenState extends State<TipsScreen> {
       "title": "Jadwal Imunisasi", 
       "desc": "Kekebalan tubuh anak.", 
       "time": "10 mnt",
-      "imageUrl": "https://images.unsplash.com/photo-1584362917165-526a968579e8?w=200", 
+      "imageUrl": "assets/images/imunisasi.jpg", 
       "targetScreen": const ImunisasiScreen(), 
     },
     {

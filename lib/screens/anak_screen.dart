@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
-import 'package:kawantumbuh/screens/grafik_lengkap_screen.dart'; // Sesuaikan path jika berbeda
+import 'package:kawantumbuh/screens/grafik_lengkap_screen.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
-import 'edit_identitas_anak_screen.dart'; // Sesuaikan path jika berbeda
-import 'catat_pertumbuhan_screen.dart'; // Sesuaikan path jika berbeda
-import 'daftar_anak_screen.dart'; // Sesuaikan path jika berbeda
+import 'edit_identitas_anak_screen.dart';
+import 'catat_pertumbuhan_screen.dart';
+import 'daftar_anak_screen.dart';
 import 'dart:math';
 
 class AnakScreen extends StatefulWidget {
@@ -69,7 +69,7 @@ class _AnakScreenState extends State<AnakScreen> {
           if (selectedIndex >= _daftarAnak.length) selectedIndex = 0;
           await _fetchRiwayat(selectedIndex);
         } else {
-           setState(() => _isLoading = false);
+            setState(() => _isLoading = false);
         }
       }
     } catch (e) {
@@ -442,7 +442,6 @@ class _AnakScreenState extends State<AnakScreen> {
 
   Widget _buildDynamicChartCard() {
     List<double> chartData = _getChartData();
-    final currentChild = _daftarAnak[selectedIndex];
 
     return Container(
       width: double.infinity,
@@ -534,22 +533,24 @@ class _AnakScreenState extends State<AnakScreen> {
             width: double.infinity,
             child: ElevatedButton.icon(
               onPressed: () {
+                final currentChild = _daftarAnak[selectedIndex]; // Ambil data anak aktif
+
                 Navigator.push(
                   context, 
                   MaterialPageRoute(
                     builder: (context) => GrafikLengkapScreen(
                       riwayatData: _riwayatPertumbuhan,
                       isBeratBadan: isBeratBadan,
-                      namaAnak: currentChild['nama'] ?? "Anak",
-                      tanggalLahir: currentChild['tanggal_lahir'] ?? "", 
-                      jenisKelamin: currentChild['jenis_kelamin'] ?? "Laki-laki", 
+                      namaAnak: currentChild['nama'] ?? "Si Kecil",
+                      tanggalLahir: currentChild['tanggal_lahir'] ?? "",
+                      jenisKelamin: currentChild['jenis_kelamin'] ?? "Laki-laki",
                     )
                   )
                 );
               },
               icon: Icon(Icons.insights, color: softPink),
               label: Text(
-                "Lihat Detail Grafik Buku KIA", 
+                "Lihat Detail Grafik Lengkap", 
                 style: TextStyle(color: softPink, fontWeight: FontWeight.bold)
               ),
               style: ElevatedButton.styleFrom(

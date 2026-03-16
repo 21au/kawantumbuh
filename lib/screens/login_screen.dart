@@ -50,7 +50,9 @@ class _LoginScreenState extends State<LoginScreen> {
     }
   }
 
-  Future<void> _login() async {
+ Future<void> _login() async {
+    print("TRACKING 1: Tombol Masuk diklik!");
+
     // 1. Validasi Input
     if (_phoneController.text.isEmpty || _passwordController.text.isEmpty) {
       _showSnackBar("No HP dan Password harus diisi!", Colors.red);
@@ -58,45 +60,57 @@ class _LoginScreenState extends State<LoginScreen> {
     }
 
     setState(() => _isLoading = true);
+    print("TRACKING 2: Loading diputar...");
 
     try {
       // 2. Normalisasi No HP (Menghapus spasi/karakter aneh)
-      final phone = _phoneController.text.trim().replaceAll(RegExp(r'[^0-9]'), '');
+      String phone = _phoneController.text.trim().replaceAll(RegExp(r'[^0-9]'), '');
+      
+      // JIKA DI SUPABASE EMAILNYA PAKAI '812...', HILANGKAN ANGKA 0 DI DEPAN:
+
       final password = _passwordController.text.trim();
       
       // Sesuaikan dengan format email saat pendaftaran
       final ninjaEmail = '$phone@kawantumbuh.com';
 
+      print("TRACKING 3: Mencoba login ke Supabase dengan email -> $ninjaEmail");
+
       // 3. Proses Auth
-      await supabase.auth.signInWithPassword(
+      final res = await supabase.auth.signInWithPassword(
         email: ninjaEmail,
         password: password,
       );
 
+      print("TRACKING 4: Berhasil Auth! Token: ${res.session?.accessToken}");
+
       // 4. Simpan Remember Me
       await _saveCredentials();
+      print("TRACKING 5: Remember Me disimpan.");
 
       // 5. Navigasi (PASTIKAN MainWrapper tidak pakai const)
       if (mounted) {
+        print("TRACKING 6: Membuka MainWrapper...");
         Navigator.pushAndRemoveUntil(
           context,
           MaterialPageRoute(builder: (context) => MainWrapper()), // JANGAN PAKAI CONST
-          (route) => false, // Hapus semua halaman sebelumnya agar tidak bisa balik ke login
+          (route) => false, // Hapus semua halaman sebelumnya
         );
       }
     } on AuthException catch (e) {
-      // Error spesifik dari Supabase (Password salah, user tidak ada, dll)
+      print("TRACKING ERROR AUTH: ${e.message}");
+      // Error spesifik dari Supabase
       String errorMsg = "Gagal masuk: Nomor atau password salah";
       if (e.message.contains("Invalid login credentials")) {
         errorMsg = "Nomor HP atau Password Bunda salah, cek lagi ya!";
       } else if (e.message.contains("Email not confirmed")) {
-        errorMsg = "Akun belum dikonfirmasi.";
+        errorMsg = "Akun belum dikonfirmasi (Matikan 'Confirm Email' di Supabase).";
       }
       _showSnackBar(errorMsg, Colors.red);
     } catch (e) {
+      print("TRACKING ERROR SISTEM: $e");
       _showSnackBar("Terjadi kesalahan koneksi. Pastikan internet aktif.", Colors.red);
-      debugPrint("Login Error: $e");
     } finally {
+      print("TRACKING 7: Proses Selesai.");
       if (mounted) setState(() => _isLoading = false);
     }
   }

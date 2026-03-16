@@ -1,16 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
-import 'package:intl/intl.dart'; 
-import 'package:url_launcher/url_launcher.dart'; // <-- Jangan lupa pastikan url_launcher sudah ada di pubspec.yaml
-import 'package:kawantumbuh/screens/statistik_pertumbuhan_screen.dart'; 
+import 'package:intl/intl.dart'; // <-- TAMBAHAN: Import intl untuk format tanggal besok
+import 'package:kawantumbuh/screens/statistik_pertumbuhan_screen.dart'; // Sesuaikan path jika beda
 import 'anak_screen.dart'; 
+import 'tips_screen.dart'; 
+import 'detail_tips_screen.dart'; 
 import 'jadwal_posyandu_screen.dart';
 
-// --- IMPORT DUA HALAMAN ARTIKEL BARU ---
-import 'kia/nutrisi_screen.dart';
-import 'kia/imunisasi_screen.dart'; 
-
 class DashboardScreen extends StatefulWidget {
+  // Callback untuk memberitahu Wrapper agar pindah ke Tab Tips
   final VoidCallback onNavigateToTips;
 
   const DashboardScreen({super.key, required this.onNavigateToTips});
@@ -25,17 +23,19 @@ class _DashboardScreenState extends State<DashboardScreen> {
   final Color softPink = const Color(0xFFFFEAEA);      
   final Color fieldPink = const Color(0xFFF5CBCB);     
   final Color highlightPink = const Color(0xFFEBA9A9); 
-  final Color brightPink = Colors.pinkAccent; 
+  final Color brightPink = Colors.pinkAccent; // Warna tambahan untuk notif
 
   String _userName = "Bunda"; 
   bool _isLoadingName = true;
   
+  // --- STATE UNTUK DATA ANAK ---
   bool _isLoadingAnak = true;
   List<Map<String, dynamic>> _daftarAnak = [];
   int _selectedAnakIndex = 0;
   String _beratBadan = "-";
   String _tinggiBadan = "-";
 
+  // --- FITUR BARU: STATE NOTIFIKASI BESOK ---
   bool _hasJadwalBesok = false;
 
   @override
@@ -45,6 +45,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
     _fetchDataAnak(); 
   }
 
+  // --- FUNGSI AMBIL NAMA BUNDA ---
   void _fetchUserName() {
     final user = Supabase.instance.client.auth.currentUser;
     if (user != null) {
@@ -56,6 +57,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
     }
   }
 
+  // --- FUNGSI AMBIL DATA ANAK DARI SUPABASE ---
   Future<void> _fetchDataAnak() async {
     try {
       final user = Supabase.instance.client.auth.currentUser;
@@ -75,7 +77,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
         if (_daftarAnak.isNotEmpty) {
           final anakId = _daftarAnak[_selectedAnakIndex]['id'];
           _fetchRiwayatTerakhir(anakId);
-          _cekJadwalBesok(anakId.toString()); 
+          _cekJadwalBesok(anakId.toString()); // Cek jadwal setelah anak diload
         }
       }
     } catch (e) {
@@ -84,20 +86,25 @@ class _DashboardScreenState extends State<DashboardScreen> {
     }
   }
 
+  // --- FUNGSI BARU: CEK JADWAL BESOK ---
+ // --- FUNGSI BARU: CEK JADWAL AKTIF (HARI INI & MASA DEPAN) ---
   Future<void> _cekJadwalBesok(String anakId) async {
     try {
+      // Ambil jam 00:00 hari ini biar akurat
       final now = DateTime.now();
       final hariIniString = DateTime(now.year, now.month, now.day).toIso8601String();
 
+      // Cari jadwal yang tanggalnya >= hari ini DAN belum selesai
       final dataJadwal = await Supabase.instance.client
           .from('jadwal_posyandu')
           .select()
           .eq('anak_id', anakId)
           .eq('is_selesai', false)
-          .gte('tanggal', hariIniString); 
+          .gte('tanggal', hariIniString); // gte = Greater Than or Equal (Hari ini ke depan)
 
       if (mounted) {
         setState(() {
+          // Kalau ada datanya, nyalakan titik merah!
           _hasJadwalBesok = dataJadwal.isNotEmpty;
         });
       }
@@ -106,6 +113,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
     }
   }
 
+  // --- FUNGSI AMBIL PENGUKURAN TERAKHIR ---
   Future<void> _fetchRiwayatTerakhir(dynamic anakId) async {
     try {
       final dataRiwayat = await Supabase.instance.client
@@ -131,6 +139,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
     }
   }
 
+  // --- FUNGSI HITUNG UMUR (BULAN) ---
   String _hitungUsia(String? tglLahir) {
     if (tglLahir == null) return "- bulan";
     try {
@@ -151,6 +160,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
     return "${days[now.weekday]}, ${now.day} ${months[now.month]} ${now.year}";
   }
 
+  // --- FUNGSI MUNCULKAN DROPDOWN PILIH ANAK ---
   void _tampilkanPilihAnak() {
     if (_daftarAnak.isEmpty) return;
 
@@ -189,10 +199,10 @@ class _DashboardScreenState extends State<DashboardScreen> {
                       _selectedAnakIndex = index;
                       _beratBadan = "-"; 
                       _tinggiBadan = "-";
-                      _hasJadwalBesok = false; 
+                      _hasJadwalBesok = false; // Reset notif saat ganti anak
                     });
                     _fetchRiwayatTerakhir(anak['id']);
-                    _cekJadwalBesok(anak['id'].toString()); 
+                    _cekJadwalBesok(anak['id'].toString()); // Cek lagi jadwal untuk anak yang baru dipilih
                     Navigator.pop(context);
                   },
                 );
@@ -203,28 +213,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
         );
       },
     );
-  }
-
-  // --- FUNGSI UNTUK MEMBUKA WHATSAPP ---
-  Future<void> _hubungiBidan() async {
-    const String nomorWhatsApp = "6282143544981"; // Nomor sudah diubah sesuai request
-    const String pesan = "Halo Bidan, saya Bunda pengguna aplikasi Kawan Tumbuh. Saya ingin berkonsultasi mengenai anak saya.";
-    
-    final Uri whatsappUrl = Uri.parse("https://wa.me/$nomorWhatsApp?text=${Uri.encodeComponent(pesan)}");
-
-    try {
-      await launchUrl(whatsappUrl, mode: LaunchMode.externalApplication);
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: const Text("Gagal membuka WhatsApp. Pastikan aplikasinya sudah terinstal ya, Bunda."),
-            backgroundColor: brightPink,
-            behavior: SnackBarBehavior.floating,
-          ),
-        );
-      }
-    }
   }
 
   @override
@@ -241,21 +229,14 @@ class _DashboardScreenState extends State<DashboardScreen> {
             _buildMenuGrid(),
             const SizedBox(height: 25),
             _buildArticleSection(),
-            const SizedBox(height: 100), // Ruang ekstra supaya konten tidak tertutup tombol chat
+            const SizedBox(height: 100), 
           ],
         ),
-      ),
-      // --- TOMBOL MELAYANG UNTUK CHAT WHATSAPP ---
-      floatingActionButton: FloatingActionButton.extended(
-        onPressed: _hubungiBidan,
-        backgroundColor: navyDark,
-        icon: const Icon(Icons.chat_rounded, color: Colors.white),
-        label: const Text("Tanya Bidan", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
-        elevation: 4,
       ),
     );
   }
 
+  // --- HEADER ---
   Widget _buildHeader() {
     return Container(
       padding: const EdgeInsets.only(top: 60, left: 25, right: 25, bottom: 30),
@@ -282,6 +263,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
                   Text(_getFormattedDate(), style: TextStyle(color: softPink, fontSize: 13)),
                 ],
               ),
+              
+              // --- UPGRADE: LONCENG DENGAN NOTIFIKASI DOT ---
               Container(
                 decoration: BoxDecoration(color: highlightPink, shape: BoxShape.circle),
                 child: Stack(
@@ -290,27 +273,40 @@ class _DashboardScreenState extends State<DashboardScreen> {
                       icon: Icon(Icons.notifications_active_outlined, color: softPink),
                       onPressed: () {
                         if (_hasJadwalBesok) {
-                          ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-                            content: const Text("Bunda, ada jadwal Posyandu! Yuk dicek kalendernya 💕"), 
-                            backgroundColor: brightPink, behavior: SnackBarBehavior.floating,
-                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
-                          ));
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              content: const Text("Bunda, ada jadwal Posyandu si Kecil yang menunggu nih! Yuk dicek kalendernya 💕"), 
+                              backgroundColor: brightPink,
+                              behavior: SnackBarBehavior.floating,
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
+                            ),
+                          );
                         } else {
-                          ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-                            content: const Text("Semua jadwal beres! 😊"), 
-                            backgroundColor: navyDark, behavior: SnackBarBehavior.floating,
-                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
-                          ));
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              content: const Text("Semua jadwal sudah beres! Belum ada notifikasi baru 😊"), 
+                              backgroundColor: navyDark,
+                              behavior: SnackBarBehavior.floating,
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
+                            ),
+                          );
                         }
                       },
                     ),
                     if (_hasJadwalBesok)
                       Positioned(
-                        right: 10, top: 10,
+                        right: 10,
+                        top: 10,
                         child: Container(
                           padding: const EdgeInsets.all(4),
-                          decoration: const BoxDecoration(color: Colors.redAccent, shape: BoxShape.circle),
-                          constraints: const BoxConstraints(minWidth: 10, minHeight: 10),
+                          decoration: const BoxDecoration(
+                            color: Colors.redAccent,
+                            shape: BoxShape.circle,
+                          ),
+                          constraints: const BoxConstraints(
+                            minWidth: 10,
+                            minHeight: 10,
+                          ),
                         ),
                       ),
                   ],
@@ -319,12 +315,15 @@ class _DashboardScreenState extends State<DashboardScreen> {
             ],
           ),
           const SizedBox(height: 30),
+          
+          // KARTU ANAK 
           _buildKartuAnakDashboard(),
         ],
       ),
     );
   }
 
+  // --- WIDGET KARTU ANAK ---
   Widget _buildKartuAnakDashboard() {
     if (_isLoadingAnak) {
       return Container(
@@ -336,9 +335,16 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
     if (_daftarAnak.isEmpty) {
       return GestureDetector(
+        // --- INI BAGIAN YANG DIPERBAIKI (REFRESH DATA) ---
         onTap: () {
-          Navigator.push(context, MaterialPageRoute(builder: (context) => const AnakScreen())).then((_) {
-            setState(() => _isLoadingAnak = true);
+          Navigator.push(
+            context, 
+            MaterialPageRoute(builder: (context) => const AnakScreen())
+          ).then((_) {
+            // Setelah kembali dari AnakScreen, loading diset true dan panggil ulang data
+            setState(() {
+              _isLoadingAnak = true;
+            });
             _fetchDataAnak();
           });
         },
@@ -371,10 +377,17 @@ class _DashboardScreenState extends State<DashboardScreen> {
       onTap: _tampilkanPilihAnak, 
       child: Container(
         padding: const EdgeInsets.all(18),
-        decoration: BoxDecoration(color: softPink.withOpacity(0.50), borderRadius: BorderRadius.circular(25)),
+        decoration: BoxDecoration(
+          color: softPink.withOpacity(0.50), 
+          borderRadius: BorderRadius.circular(25),
+        ),
         child: Row(
           children: [
-            CircleAvatar(backgroundColor: highlightPink, radius: 28, child: Icon(Icons.child_care, color: softPink, size: 32)),
+            CircleAvatar(
+              backgroundColor: highlightPink,
+              radius: 28,
+              child: Icon(Icons.child_care, color: softPink, size: 32),
+            ),
             const SizedBox(width: 15),
             Expanded(
               child: Column(
@@ -392,6 +405,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
     );
   }
 
+  // --- MENU GRID ---
   Widget _buildMenuGrid() {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 25),
@@ -406,6 +420,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
     );
   }
 
+  // --- FUNGSI KLIK MENU ---
   Widget _buildMenuCard(IconData icon, String title, String subtitle) {
     double width = (MediaQuery.of(context).size.width - 70) / 3;
     return GestureDetector(
@@ -413,23 +428,38 @@ class _DashboardScreenState extends State<DashboardScreen> {
         if (title == "Tips Sehat") {
           widget.onNavigateToTips();
         } else if (title == "Pertumbuhan") {
-          if (_daftarAnak.isEmpty) return;
+          if (_daftarAnak.isEmpty) {
+            ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("Silakan tambah data anak terlebih dahulu", style: TextStyle(color: softPink)), backgroundColor: navyDark));
+            return;
+          }
           final anakAktif = _daftarAnak[_selectedAnakIndex];
           Navigator.push(context, MaterialPageRoute(
             builder: (context) => StatistikPertumbuhanScreen(anakId: anakAktif['id'].toString(), namaAnak: anakAktif['nama'] ?? 'Si Kecil')
-          )).then((_) => _cekJadwalBesok(anakAktif['id'].toString()));
+          )).then((_) {
+            // Cek ulang jadwal ketika kembali dari halaman lain
+            _cekJadwalBesok(anakAktif['id'].toString());
+          });
         } else if (title == "Jadwal") {
-          if (_daftarAnak.isEmpty) return;
+          if (_daftarAnak.isEmpty) {
+            ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("Silakan tambah data anak terlebih dahulu", style: TextStyle(color: softPink)), backgroundColor: navyDark));
+            return;
+          }
           final anakAktif = _daftarAnak[_selectedAnakIndex];
           Navigator.push(context, MaterialPageRoute(
             builder: (context) => JadwalPosyanduScreen(anakId: anakAktif['id'].toString(), namaAnak: anakAktif['nama'] ?? 'Si Kecil')
-          )).then((_) => _cekJadwalBesok(anakAktif['id'].toString()));
+          )).then((_) {
+             // Penting: Cek ulang jadwal saat Ibu kembali dari halaman Jadwal! 
+             // (Mencegah notifikasi tetap merah kalau jadwal sudah dicentang selesai)
+            _cekJadwalBesok(anakAktif['id'].toString());
+          });
         }
       },
       child: Container(
-        width: width, padding: const EdgeInsets.symmetric(vertical: 20, horizontal: 10),
+        width: width,
+        padding: const EdgeInsets.symmetric(vertical: 20, horizontal: 10),
         decoration: BoxDecoration(
-          color: navyDark, borderRadius: BorderRadius.circular(25),
+          color: navyDark, 
+          borderRadius: BorderRadius.circular(25),
           boxShadow: [BoxShadow(color: navyDark.withOpacity(0.2), blurRadius: 8, offset: const Offset(0, 4))],
         ),
         child: Column(
@@ -445,6 +475,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
     );
   }
 
+  // --- ARTIKEL SECTION ---
   Widget _buildArticleSection() {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 25),
@@ -464,66 +495,97 @@ class _DashboardScreenState extends State<DashboardScreen> {
           const SizedBox(height: 15),
           
           _buildArticleCard(
-            category: "Nutrisi & MPASI", 
-            title: "Panduan Gizi & Makanan Untuk Tumbuh Kembang Anak", 
-            desc: "Berdasarkan pedoman IDAI dan Kemenkes untuk mencegah stunting.", 
-            imageUrl: "https://images.unsplash.com/photo-1519689680058-324335c77eba?auto=format&fit=crop&w=800&q=80",
-            targetScreen: const NutrisiScreen(), 
+            itemData: {
+              "category": "Nutrisi", 
+              "title": "10 Makanan Terbaik Untuk Tumbuh Kembang Anak", 
+              "desc": "Pastikan si kecil mendapatkan asupan nutrisi lengkap dari sayur dan protein hewani untuk mendukung pertumbuhan maksimalnya.", 
+              "time": "5 mnt",
+              "imageUrl": "assets/images/makanan.jpeg",
+            },
           ),
           
-          _buildArticleCard(
-            category: "Kesehatan Anak", 
-            title: "Jadwal Imunisasi Bayi dan Balita", 
-            desc: "Jadwal lengkap imunisasi dasar dan lanjutan sesuai dengan anjuran kesehatan.", 
-            imageUrl: "https://images.unsplash.com/photo-1584362917165-526a968579e8?auto=format&fit=crop&w=800&q=80", 
-            targetScreen: const ImunisasiScreen(), 
-          ),
+         _buildArticleCard(
+          itemData: {
+            "category": "Kesehatan", 
+            "title": "Jadwal Imunisasi Dasar Lengkap", 
+            "desc": "Jangan sampai terlewat! Cek jadwal imunisasi dasar untuk melindungi si Kecil dari berbagai penyakit berbahaya sejak dini.", 
+            "time": "10 mnt",
+            "imageUrl": "assets/images/imunisasi.jpg",
+          },
+        ),
         ],
       ),
     );
   }
 
-  Widget _buildArticleCard({
-    required String category,
-    required String title,
-    required String desc,
-    required String imageUrl,
-    required Widget targetScreen,
-  }) {
-    return GestureDetector(
-      onTap: () => Navigator.push(context, MaterialPageRoute(builder: (context) => targetScreen)),
-      child: Container(
-        margin: const EdgeInsets.only(bottom: 20),
-        decoration: BoxDecoration(color: fieldPink, borderRadius: BorderRadius.circular(25)),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            ClipRRect(
-              borderRadius: const BorderRadius.vertical(top: Radius.circular(25)),
-              child: Image.network(
-                imageUrl, height: 150, width: double.infinity, fit: BoxFit.cover,
-                errorBuilder: (context, error, stackTrace) => Container(
-                  height: 150, width: double.infinity, color: highlightPink,
-                  child: Icon(Icons.image, color: softPink, size: 40),
-                ),
-              ),
-            ),
-            Padding(
-              padding: const EdgeInsets.all(20),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(category.toUpperCase(), style: TextStyle(color: navyDark.withOpacity(0.6), fontSize: 11, fontWeight: FontWeight.bold, letterSpacing: 1)),
-                  const SizedBox(height: 8),
-                  Text(title, style: TextStyle(color: navyDark, fontWeight: FontWeight.bold, fontSize: 16)),
-                  const SizedBox(height: 8),
-                  Text(desc, maxLines: 2, overflow: TextOverflow.ellipsis, style: TextStyle(color: navyDark.withOpacity(0.8), fontSize: 13, height: 1.4)),
-                ],
-              ),
-            ),
-          ],
-        ),
+  Widget _buildArticleCard({required Map<String, String> itemData}) {
+  final String imageUrl = itemData['imageUrl'] ?? '';
+  // Cek apakah ini link internet atau file lokal
+  final bool isNetworkImage = imageUrl.startsWith('http');
+
+  return GestureDetector(
+    onTap: () => Navigator.push(
+        context,
+        MaterialPageRoute(
+            builder: (context) => DetailTipsScreen(item: itemData))),
+    child: Container(
+      margin: const EdgeInsets.only(bottom: 20),
+      decoration: BoxDecoration(
+        color: fieldPink,
+        borderRadius: BorderRadius.circular(25),
       ),
-    );
-  }
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          ClipRRect(
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(25)),
+            child: isNetworkImage
+                ? Image.network(
+                    imageUrl,
+                    height: 150,
+                    width: double.infinity,
+                    fit: BoxFit.cover,
+                    errorBuilder: (context, error, stackTrace) => _buildErrorPlaceholder(),
+                  )
+                : Image.asset(
+                    imageUrl,
+                    height: 150,
+                    width: double.infinity,
+                    fit: BoxFit.cover,
+                    errorBuilder: (context, error, stackTrace) => _buildErrorPlaceholder(),
+                  ),
+          ),
+          Padding(
+            padding: const EdgeInsets.all(20),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(itemData['title']!,
+                    style: TextStyle(
+                        color: navyDark,
+                        fontWeight: FontWeight.bold,
+                        fontSize: 15)),
+                const SizedBox(height: 8),
+                Text(itemData['desc']!,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                        color: navyDark.withOpacity(0.8), fontSize: 13)),
+              ],
+            ),
+          ),
+        ],
+      ),
+    ),
+  );
 }
+
+// Fungsi tambahan untuk tampilan kalau gambar gagal loading
+Widget _buildErrorPlaceholder() {
+  return Container(
+    height: 150,
+    width: double.infinity,
+    color: highlightPink,
+    child: Icon(Icons.broken_image, color: softPink, size: 40),
+  );
+}}
