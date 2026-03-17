@@ -152,7 +152,7 @@ class _CatatPertumbuhanScreenState extends State<CatatPertumbuhanScreen> {
                 const SizedBox(height: 25),
                 const Text("Catat Tumbuh Kembang", style: TextStyle(color: Colors.white, fontSize: 22, fontWeight: FontWeight.bold)),
                 const SizedBox(height: 8),
-                Text("Isi data pengukuran bulan ini ya, Bun!", style: TextStyle(color: Colors.white, fontSize: 14)),
+                const Text("Isi data pengukuran bulan ini ya, Bun!", style: TextStyle(color: Colors.white, fontSize: 14)),
               ],
             ),
           ),
@@ -273,12 +273,16 @@ class _CatatPertumbuhanScreenState extends State<CatatPertumbuhanScreen> {
           Row(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              // Tombol Minus (Salmon Pink)
+              // Tombol Minus (Salmon Pink) - SEKARANG BULAT
               InkWell(
-                onTap: onMinus, borderRadius: BorderRadius.circular(12),
+                onTap: onMinus, 
+                customBorder: const CircleBorder(), // Efek klik ikut bulat
                 child: Container(
                   width: 55, height: 55,
-                  decoration: BoxDecoration(color: minusBtnColor, borderRadius: BorderRadius.circular(14)),
+                  decoration: BoxDecoration(
+                    color: minusBtnColor, 
+                    shape: BoxShape.circle, // Membuat bentuknya bulat sempurna
+                  ),
                   child: const Icon(Icons.remove, color: Colors.white, size: 32),
                 ),
               ),
@@ -304,12 +308,16 @@ class _CatatPertumbuhanScreenState extends State<CatatPertumbuhanScreen> {
               
               const Spacer(),
               
-              // Tombol Plus (Biru Ocean)
+              // Tombol Plus (Biru Ocean) - SEKARANG BULAT
               InkWell(
-                onTap: onPlus, borderRadius: BorderRadius.circular(12),
+                onTap: onPlus, 
+                customBorder: const CircleBorder(), // Efek klik ikut bulat
                 child: Container(
                   width: 55, height: 55,
-                  decoration: BoxDecoration(color: plusBtnColor, borderRadius: BorderRadius.circular(14)),
+                  decoration: BoxDecoration(
+                    color: plusBtnColor, 
+                    shape: BoxShape.circle, // Membuat bentuknya bulat sempurna
+                  ),
                   child: const Icon(Icons.add, color: Colors.white, size: 32),
                 ),
               ),
