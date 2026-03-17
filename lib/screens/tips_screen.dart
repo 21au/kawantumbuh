@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:kawantumbuh/screens/kia/polaasuh_screen.dart';
 
 // --- IMPORT HALAMAN ARTIKEL YANG SUDAH DIBUAT ---
 import 'kia/nutrisi_screen.dart';
@@ -108,6 +109,14 @@ class _TipsScreenState extends State<TipsScreen> {
       "time": "5 mnt",
       "imageUrl": "https://images.unsplash.com/photo-1606811841689-23dfddce3e95?w=200", 
       "targetScreen": const MerawatGigiSusuScreen(), 
+    },
+    {
+      "category": "Pola Asuh Anak Yang Baik", 
+      "title": "Apa itu pola asuh anak?", 
+      "desc": "Cara mendidik anak dengan pola asuh yang tepat.", 
+      "time": "5 mnt",
+      "imageUrl": "assets/images/polaasuh.jpeg", 
+      "targetScreen": const PolaAsuhScreen(), 
     },
   ];
 

@@ -1,11 +1,16 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
-import 'package:intl/intl.dart'; // <-- TAMBAHAN: Import intl untuk format tanggal besok
-import 'package:kawantumbuh/screens/statistik_pertumbuhan_screen.dart'; // Sesuaikan path jika beda
+import 'package:intl/intl.dart'; 
+import 'package:kawantumbuh/screens/statistik_pertumbuhan_screen.dart'; 
 import 'anak_screen.dart'; 
 import 'tips_screen.dart'; 
 import 'detail_tips_screen.dart'; 
 import 'jadwal_posyandu_screen.dart';
+
+// --- TAMBAHAN IMPORT HALAMAN ARTIKEL BUNDA ---
+import 'kia/makanan_terbaik_screen.dart';
+import 'kia/imunisasi_screen.dart';
+import 'kia/polaasuh_screen.dart';
 
 class DashboardScreen extends StatefulWidget {
   // Callback untuk memberitahu Wrapper agar pindah ke Tab Tips
@@ -86,8 +91,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
     }
   }
 
-  // --- FUNGSI BARU: CEK JADWAL BESOK ---
- // --- FUNGSI BARU: CEK JADWAL AKTIF (HARI INI & MASA DEPAN) ---
+  // --- FUNGSI BARU: CEK JADWAL AKTIF (HARI INI & MASA DEPAN) ---
   Future<void> _cekJadwalBesok(String anakId) async {
     try {
       // Ambil jam 00:00 hari ini biar akurat
@@ -335,13 +339,11 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
     if (_daftarAnak.isEmpty) {
       return GestureDetector(
-        // --- INI BAGIAN YANG DIPERBAIKI (REFRESH DATA) ---
         onTap: () {
           Navigator.push(
             context, 
             MaterialPageRoute(builder: (context) => const AnakScreen())
           ).then((_) {
-            // Setelah kembali dari AnakScreen, loading diset true dan panggil ulang data
             setState(() {
               _isLoadingAnak = true;
             });
@@ -436,7 +438,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
           Navigator.push(context, MaterialPageRoute(
             builder: (context) => StatistikPertumbuhanScreen(anakId: anakAktif['id'].toString(), namaAnak: anakAktif['nama'] ?? 'Si Kecil')
           )).then((_) {
-            // Cek ulang jadwal ketika kembali dari halaman lain
             _cekJadwalBesok(anakAktif['id'].toString());
           });
         } else if (title == "Jadwal") {
@@ -448,8 +449,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
           Navigator.push(context, MaterialPageRoute(
             builder: (context) => JadwalPosyanduScreen(anakId: anakAktif['id'].toString(), namaAnak: anakAktif['nama'] ?? 'Si Kecil')
           )).then((_) {
-             // Penting: Cek ulang jadwal saat Ibu kembali dari halaman Jadwal! 
-             // (Mencegah notifikasi tetap merah kalau jadwal sudah dicentang selesai)
             _cekJadwalBesok(anakAktif['id'].toString());
           });
         }
@@ -510,7 +509,17 @@ class _DashboardScreenState extends State<DashboardScreen> {
             "title": "Jadwal Imunisasi Dasar Lengkap", 
             "desc": "Jangan sampai terlewat! Cek jadwal imunisasi dasar untuk melindungi si Kecil dari berbagai penyakit berbahaya sejak dini.", 
             "time": "10 mnt",
-            "imageUrl": "assets/images/imunisasi.jpg",
+            "imageUrl": "assets/images/imunisasi.jpg", 
+          },
+        ),
+
+        _buildArticleCard(
+          itemData: {
+            "category": "Pola Asuh", 
+            "title": "Cara Mengatasi Tantrum pada Anak", 
+            "desc": "Anak sering menangis berguling-guling? Tenang Bunda, berikut adalah langkah efektif untuk menghadapi tantrum.", 
+            "time": "7 mnt",
+            "imageUrl": "assets/images/polaasuh.jpeg", 
           },
         ),
         ],
@@ -518,74 +527,85 @@ class _DashboardScreenState extends State<DashboardScreen> {
     );
   }
 
+  // --- UPDATE PENTING: MENGARAHKAN KE SCREEN YANG BENAR ---
   Widget _buildArticleCard({required Map<String, String> itemData}) {
-  final String imageUrl = itemData['imageUrl'] ?? '';
-  // Cek apakah ini link internet atau file lokal
-  final bool isNetworkImage = imageUrl.startsWith('http');
+    final String imageUrl = itemData['imageUrl'] ?? '';
+    final bool isNetworkImage = imageUrl.startsWith('http');
 
-  return GestureDetector(
-    onTap: () => Navigator.push(
-        context,
-        MaterialPageRoute(
-            builder: (context) => DetailTipsScreen(item: itemData))),
-    child: Container(
-      margin: const EdgeInsets.only(bottom: 20),
-      decoration: BoxDecoration(
-        color: fieldPink,
-        borderRadius: BorderRadius.circular(25),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          ClipRRect(
-            borderRadius: const BorderRadius.vertical(top: Radius.circular(25)),
-            child: isNetworkImage
-                ? Image.network(
-                    imageUrl,
-                    height: 150,
-                    width: double.infinity,
-                    fit: BoxFit.cover,
-                    errorBuilder: (context, error, stackTrace) => _buildErrorPlaceholder(),
-                  )
-                : Image.asset(
-                    imageUrl,
-                    height: 150,
-                    width: double.infinity,
-                    fit: BoxFit.cover,
-                    errorBuilder: (context, error, stackTrace) => _buildErrorPlaceholder(),
-                  ),
-          ),
-          Padding(
-            padding: const EdgeInsets.all(20),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(itemData['title']!,
-                    style: TextStyle(
-                        color: navyDark,
-                        fontWeight: FontWeight.bold,
-                        fontSize: 15)),
-                const SizedBox(height: 8),
-                Text(itemData['desc']!,
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                    style: TextStyle(
-                        color: navyDark.withOpacity(0.8), fontSize: 13)),
-              ],
+    return GestureDetector(
+      onTap: () {
+        // Cek judul artikel untuk menentukan halaman yang dibuka
+        if (itemData['title'] == "10 Makanan Terbaik Untuk Tumbuh Kembang Anak") {
+          Navigator.push(context, MaterialPageRoute(builder: (context) => const MakananTerbaikScreen()));
+        } else if (itemData['title'] == "Jadwal Imunisasi Dasar Lengkap") {
+          Navigator.push(context, MaterialPageRoute(builder: (context) => const ImunisasiScreen()));
+        } else if (itemData['category'] == "Pola Asuh") {
+          // Buka PolaAsuhScreen yang baru dibuat
+          Navigator.push(context, MaterialPageRoute(builder: (context) => const PolaAsuhScreen()));
+        } else {
+          // Default: Buka halaman detail bawaan jika artikel belum ada screen khususnya
+          Navigator.push(context, MaterialPageRoute(builder: (context) => DetailTipsScreen(item: itemData)));
+        }
+      },
+      child: Container(
+        margin: const EdgeInsets.only(bottom: 20),
+        decoration: BoxDecoration(
+          color: fieldPink,
+          borderRadius: BorderRadius.circular(25),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            ClipRRect(
+              borderRadius: const BorderRadius.vertical(top: Radius.circular(25)),
+              child: isNetworkImage
+                  ? Image.network(
+                      imageUrl,
+                      height: 150,
+                      width: double.infinity,
+                      fit: BoxFit.cover,
+                      errorBuilder: (context, error, stackTrace) => _buildErrorPlaceholder(),
+                    )
+                  : Image.asset(
+                      imageUrl,
+                      height: 150,
+                      width: double.infinity,
+                      fit: BoxFit.cover,
+                      errorBuilder: (context, error, stackTrace) => _buildErrorPlaceholder(),
+                    ),
             ),
-          ),
-        ],
+            Padding(
+              padding: const EdgeInsets.all(20),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(itemData['title']!,
+                      style: TextStyle(
+                          color: navyDark,
+                          fontWeight: FontWeight.bold,
+                          fontSize: 15)),
+                  const SizedBox(height: 8),
+                  Text(itemData['desc']!,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                          color: navyDark.withOpacity(0.8), fontSize: 13)),
+                ],
+              ),
+            ),
+          ],
+        ),
       ),
-    ),
-  );
-}
+    );
+  }
 
-// Fungsi tambahan untuk tampilan kalau gambar gagal loading
-Widget _buildErrorPlaceholder() {
-  return Container(
-    height: 150,
-    width: double.infinity,
-    color: highlightPink,
-    child: Icon(Icons.broken_image, color: softPink, size: 40),
-  );
-}}
+  // Fungsi tambahan untuk tampilan kalau gambar gagal loading
+  Widget _buildErrorPlaceholder() {
+    return Container(
+      height: 150,
+      width: double.infinity,
+      color: highlightPink,
+      child: Icon(Icons.broken_image, color: softPink, size: 40),
+    );
+  }
+}
