@@ -309,28 +309,39 @@ class _AnakScreenState extends State<AnakScreen> {
   }
 
   Widget _buildChildSelector() {
-    return SizedBox(
-      height: 40,
-      child: ListView.builder(
-        scrollDirection: Axis.horizontal,
-        itemCount: _daftarAnak.length,
-        itemBuilder: (context, index) {
-          bool isSelected = selectedIndex == index;
-          return GestureDetector(
-            onTap: () {
-              setState(() { selectedIndex = index; _isLoading = true; });
-              _fetchRiwayat(index);
-            },
-            child: AnimatedContainer(
-              duration: const Duration(milliseconds: 300),
-              margin: const EdgeInsets.only(right: 10),
-              padding: const EdgeInsets.symmetric(horizontal: 20),
-              decoration: BoxDecoration(color: isSelected ? highlightPink : softPink.withOpacity(0.25), borderRadius: BorderRadius.circular(25)),
-              alignment: Alignment.center,
-              child: Text(_daftarAnak[index]['nama'] ?? "Anak", style: TextStyle(color: isSelected ? navyDark : softPink.withOpacity(0.8), fontWeight: isSelected ? FontWeight.bold : FontWeight.normal)),
-            ),
-          );
-        },
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+      decoration: BoxDecoration(
+        color: softPink.withOpacity(0.15),
+        borderRadius: BorderRadius.circular(15),
+        border: Border.all(color: softPink.withOpacity(0.3), width: 1.5),
+      ),
+      child: DropdownButtonHideUnderline(
+        child: DropdownButton<int>(
+          value: selectedIndex,
+          isExpanded: true,
+          icon: Icon(Icons.keyboard_arrow_down_rounded, color: softPink, size: 28),
+          dropdownColor: navyDark, 
+          style: TextStyle(color: softPink, fontSize: 16, fontWeight: FontWeight.bold),
+          items: List.generate(_daftarAnak.length, (index) {
+            return DropdownMenuItem<int>(
+              value: index,
+              child: Text(
+                _daftarAnak[index]['nama'] ?? "Anak",
+                style: const TextStyle(fontWeight: FontWeight.w600),
+              ),
+            );
+          }),
+          onChanged: (int? newValue) {
+            if (newValue != null && newValue != selectedIndex) {
+              setState(() { 
+                selectedIndex = newValue; 
+                _isLoading = true; 
+              });
+              _fetchRiwayat(newValue);
+            }
+          },
+        ),
       ),
     );
   }

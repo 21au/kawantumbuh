@@ -30,6 +30,8 @@ class _GrafikLengkapScreenState extends State<GrafikLengkapScreen> {
   final Color zoneRedLine = const Color(0xFFD32F2F);
 
   List<Map<String, double>> plottedPoints = [];
+  
+  bool _isPanduanOpen = false;
 
   @override
   void initState() {
@@ -84,115 +86,152 @@ class _GrafikLengkapScreenState extends State<GrafikLengkapScreen> {
     return Scaffold(
       backgroundColor: kmsBackground,
       body: SafeArea(
-        child: Row(
+        child: Stack(
           children: [
-            Expanded(
-              flex: 7,
-              child: Stack(
-                children: [
-                  LayoutBuilder(
-                    builder: (context, constraints) {
-                      double canvasHeight = constraints.maxHeight;
-                      double canvasWidth = canvasHeight * 3.5; // Sedikit lebih panjang agar teks di atas lega
+            Positioned.fill(
+              child: LayoutBuilder(
+                builder: (context, constraints) {
+                  double canvasHeight = constraints.maxHeight;
+                  double canvasWidth = canvasHeight * 3.5; 
 
-                      return InteractiveViewer(
-                        constrained: false,
-                        boundaryMargin: const EdgeInsets.all(50),
-                        minScale: 0.5,
-                        maxScale: 4.0,
-                        child: Container(
-                          color: Colors.white,
-                          padding: const EdgeInsets.only(top: 20, right: 40, bottom: 80, left: 60),
-                          width: canvasWidth,
-                          height: canvasHeight,
-                          child: CustomPaint(
-                            size: Size(canvasWidth, canvasHeight - 100), 
-                            painter: BukuKmsPainter(
-                              isBerat: widget.isBeratBadan,
-                              dataPoints: plottedPoints,
-                              maxAge: maxAgeMonths,
-                              maxValue: maxValue,
-                              minValue: minValue,
-                            ),
-                          ),
+                  return InteractiveViewer(
+                    constrained: false,
+                    boundaryMargin: const EdgeInsets.all(50),
+                    minScale: 0.5,
+                    maxScale: 4.0,
+                    child: Container(
+                      color: Colors.white,
+                      padding: const EdgeInsets.only(top: 20, right: 40, bottom: 80, left: 100), 
+                      width: canvasWidth,
+                      height: canvasHeight,
+                      child: CustomPaint(
+                        size: Size(canvasWidth, canvasHeight - 100), 
+                        painter: BukuKmsPainter(
+                          isBerat: widget.isBeratBadan,
+                          dataPoints: plottedPoints,
+                          maxAge: maxAgeMonths,
+                          maxValue: maxValue,
+                          minValue: minValue,
                         ),
-                      );
-                    },
+                      ),
+                    ),
+                  );
+                },
+              ),
+            ),
+
+            Positioned(
+              bottom: 15, left: 0, right: 0,
+              child: Center(
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                  decoration: BoxDecoration(color: Colors.black87.withOpacity(0.7), borderRadius: BorderRadius.circular(20)),
+                  child: const Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(Icons.pinch, color: Colors.white, size: 14),
+                      SizedBox(width: 8),
+                      Text("Zoom & Geser dengan 2 jari", style: TextStyle(color: Colors.white, fontSize: 11)),
+                    ],
                   ),
-                  
-                  Positioned(
-                    bottom: 15, left: 0, right: 0,
-                    child: Center(
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                        decoration: BoxDecoration(color: Colors.black87.withOpacity(0.7), borderRadius: BorderRadius.circular(20)),
-                        child: const Row(
-                          mainAxisSize: MainAxisSize.min,
+                ),
+              ),
+            ),
+
+            Positioned(
+              top: 16,
+              left: 16,
+              child: Material(
+                color: Colors.white.withOpacity(0.9),
+                shape: const CircleBorder(),
+                elevation: 4,
+                child: IconButton(
+                  icon: const Icon(Icons.arrow_back_ios_new_rounded, color: Colors.black87),
+                  onPressed: () => Navigator.pop(context),
+                  tooltip: 'Kembali',
+                ),
+              ),
+            ),
+
+            AnimatedPositioned(
+              duration: const Duration(milliseconds: 300),
+              curve: Curves.easeInOut,
+              right: _isPanduanOpen ? 0 : -300, 
+              top: 0,
+              bottom: 0,
+              child: Container(
+                width: 300, 
+                decoration: BoxDecoration(color: Colors.white, boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.1), blurRadius: 10, offset: const Offset(-3, 0))]),
+                child: Column(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(16),
+                      width: double.infinity,
+                      color: kmsBackground.withOpacity(0.5),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(widget.namaAnak, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                          Text("Buku KIA ${widget.isBeratBadan ? '(BB)' : '(TB)'}", style: const TextStyle(fontSize: 12, color: Colors.black54)),
+                        ],
+                      ),
+                    ),
+                    Expanded(
+                      child: SingleChildScrollView(
+                        padding: const EdgeInsets.all(16),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Icon(Icons.pinch, color: Colors.white, size: 14),
-                            SizedBox(width: 8),
-                            Text("Zoom & Geser dengan 2 jari", style: TextStyle(color: Colors.white, fontSize: 11)),
+                            const Text("Panduan Membaca KMS", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+                            const SizedBox(height: 15),
+                            _legendItem(zoneGreenDark, "Pita Hijau Tua", "Pertumbuhan Ideal / Normal."),
+                            const SizedBox(height: 12),
+                            _legendItem(zoneGreenLight, "Pita Hijau Muda", "Masih Normal, pantau trennya."),
+                            const SizedBox(height: 12),
+                            _legendItem(zoneYellow, "Pita Kuning", "Waspada! Risiko gizi kurang/lebih."),
+                            const SizedBox(height: 12),
+                            _legendItem(zoneRedLine, "BGM", "Sangat Kurang! Rujuk ke Faskes.", isLine: true),
+                            const Padding(padding: EdgeInsets.symmetric(vertical: 15), child: Divider()),
+                            const Text("Istilah Posyandu:", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+                            const SizedBox(height: 8),
+                            _textLegend("N (Naik)", "Grafik memotong garis sejajar di atasnya."),
+                            const SizedBox(height: 8),
+                            _textLegend("T (Tidak Naik)", "Grafik mendatar/menurun."),
                           ],
                         ),
                       ),
                     ),
-                  )
-                ],
+                  ],
+                ),
               ),
             ),
 
-            Container(
-              width: 300, 
-              decoration: BoxDecoration(color: Colors.white, boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.1), blurRadius: 10, offset: const Offset(-3, 0))]),
-              child: Column(
-                children: [
-                  Container(
-                    padding: const EdgeInsets.all(16),
-                    color: kmsBackground.withOpacity(0.5),
-                    child: Row(
-                      children: [
-                        IconButton(icon: const Icon(Icons.arrow_back_ios_new, size: 20), onPressed: () => Navigator.pop(context), style: IconButton.styleFrom(backgroundColor: Colors.white)),
-                        const SizedBox(width: 10),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(widget.namaAnak, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
-                              Text("Buku KIA ${widget.isBeratBadan ? '(BB)' : '(TB)'}", style: const TextStyle(fontSize: 12, color: Colors.black54)),
-                            ],
-                          ),
-                        ),
-                      ],
+            AnimatedPositioned(
+              duration: const Duration(milliseconds: 300),
+              curve: Curves.easeInOut,
+              right: _isPanduanOpen ? 300 : 0, 
+              top: 16,
+              child: Material(
+                color: Colors.white,
+                borderRadius: const BorderRadius.only(topLeft: Radius.circular(15), bottomLeft: Radius.circular(15)),
+                elevation: 4,
+                child: InkWell(
+                  onTap: () {
+                    setState(() {
+                      _isPanduanOpen = !_isPanduanOpen;
+                    });
+                  },
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(vertical: 15, horizontal: 10),
+                    child: Icon(
+                      _isPanduanOpen ? Icons.arrow_forward_ios_rounded : Icons.arrow_back_ios_new_rounded,
+                      color: Colors.black87,
+                      size: 20,
                     ),
                   ),
-                  Expanded(
-                    child: SingleChildScrollView(
-                      padding: const EdgeInsets.all(16),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          const Text("Panduan Membaca KMS", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
-                          const SizedBox(height: 15),
-                          _legendItem(zoneGreenDark, "Pita Hijau Tua", "Pertumbuhan Ideal / Normal."),
-                          const SizedBox(height: 12),
-                          _legendItem(zoneGreenLight, "Pita Hijau Muda", "Masih Normal, pantau trennya."),
-                          const SizedBox(height: 12),
-                          _legendItem(zoneYellow, "Pita Kuning", "Waspada! Risiko gizi kurang/lebih."),
-                          const SizedBox(height: 12),
-                          _legendItem(zoneRedLine, "BGM", "Sangat Kurang! Rujuk ke Faskes.", isLine: true),
-                          const Padding(padding: EdgeInsets.symmetric(vertical: 15), child: Divider()),
-                          const Text("Istilah Posyandu:", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
-                          const SizedBox(height: 8),
-                          _textLegend("N (Naik)", "Grafik memotong garis sejajar di atasnya."),
-                          const SizedBox(height: 8),
-                          _textLegend("T (Tidak Naik)", "Grafik mendatar/menurun."),
-                        ],
-                      ),
-                    ),
-                  ),
-                ],
+                ),
               ),
-            )
+            ),
           ],
         ),
       ),
@@ -225,7 +264,6 @@ class BukuKmsPainter extends CustomPainter {
   final double maxValue; 
   final double minValue; 
 
-  // Area atas khusus untuk ilustrasi milestone (dalam pixel)
   final double headerHeight = 90.0; 
 
   BukuKmsPainter({
@@ -241,19 +279,15 @@ class BukuKmsPainter extends CustomPainter {
     final w = size.width;
     final h = size.height;
 
-    _drawMilestones(canvas, w); // <--- INI FUNGSI BARUNYA
+    _drawMilestones(canvas, w); 
     _drawKmsZones(canvas, w, h);
     _drawGridAndLabels(canvas, w, h);
     _plotUserData(canvas, w, h);
   }
 
-  // =====================================================================
-  // FUNGSI BARU: MENGGAMBAR ILUSTRASI TUMBUH KEMBANG DI ATAS GRAFIK
-  // =====================================================================
   void _drawMilestones(Canvas canvas, double w) {
     final linePaint = Paint()..color = Colors.black54..strokeWidth = 1..style = PaintingStyle.stroke;
 
-    // Data Milestone (Batas Bulan, Deskripsi, dan Emoji Ilustrasi)
     final milestones = [
       {'start': 0, 'end': 3, 'desc': 'Mengangkat\nkepala', 'icon': '👶'},
       {'start': 3, 'end': 6, 'desc': 'Tengkurap\n& Duduk', 'icon': '🧸'},
@@ -265,66 +299,74 @@ class BukuKmsPainter extends CustomPainter {
       {'start': 36, 'end': 60, 'desc': 'Bermain aktif\nMandiri', 'icon': '🤸'},
     ];
 
-    // Judul Header
     _drawText(canvas, "PANDUAN PERTUMBUHAN & PERKEMBANGAN ANAK", const Offset(0, -15), const TextStyle(fontWeight: FontWeight.bold, fontSize: 12, color: Colors.red));
 
     for (var m in milestones) {
       double startX = ((m['start'] as int) / maxAge) * w;
       double endX = ((m['end'] as int) / maxAge) * w;
       double centerX = startX + ((endX - startX) / 2);
+      
+      double colWidth = endX - startX; 
 
-      // Garis vertikal pembatas antar milestone
       if (m['start'] != 0) {
         canvas.drawLine(Offset(startX, 10), Offset(startX, headerHeight), linePaint);
       }
 
-      // Gambar Teks Deskripsi
-      final tpDesc = TextPainter(
-        text: TextSpan(text: m['desc'] as String, style: const TextStyle(fontSize: 9, color: Colors.black87)),
-        textAlign: TextAlign.center,
-        textDirection: TextDirection.ltr,
-      )..layout();
+      double currentFontSize = 9.0;
+      TextPainter tpDesc;
+      
+      while (true) {
+        tpDesc = TextPainter(
+          text: TextSpan(text: m['desc'] as String, style: TextStyle(fontSize: currentFontSize, color: Colors.black87)),
+          textAlign: TextAlign.center,
+          textDirection: TextDirection.ltr,
+        )..layout();
+
+        if (tpDesc.width > colWidth - 6 && currentFontSize > 5.0) {
+          currentFontSize -= 0.5;
+        } else {
+          break; 
+        }
+      }
+      
       tpDesc.paint(canvas, Offset(centerX - (tpDesc.width / 2), 15));
 
-      // Gambar Emoji sebagai pengganti ilustrasi bayi
       final tpIcon = TextPainter(
         text: TextSpan(text: m['icon'] as String, style: const TextStyle(fontSize: 24)),
         textDirection: TextDirection.ltr,
       )..layout();
       tpIcon.paint(canvas, Offset(centerX - (tpIcon.width / 2), 40));
       
-      // Keterangan bulan kecil di bawah icon
       final tpBulan = TextPainter(text: TextSpan(text: "${m['start']}-${m['end']} bln", style: const TextStyle(fontSize: 8, fontWeight: FontWeight.bold, color: Colors.black54)), textDirection: TextDirection.ltr)..layout();
       tpBulan.paint(canvas, Offset(centerX - (tpBulan.width / 2), 70));
     }
     
-    // Garis batas bawah untuk area milestone
     canvas.drawLine(Offset(0, headerHeight), Offset(w, headerHeight), Paint()..color = Colors.black..strokeWidth = 2);
   }
 
   void _drawGridAndLabels(Canvas canvas, double w, double h) {
     final gridPaint = Paint()..color = Colors.grey.withOpacity(0.5)..strokeWidth = 1;
     final heavyGridPaint = Paint()..color = Colors.black45..strokeWidth = 1.5;
-    final textStyle = const TextStyle(color: Colors.black87, fontSize: 10);
     final boldTextStyle = const TextStyle(color: Colors.black87, fontSize: 10, fontWeight: FontWeight.bold);
 
-    // Ketinggian Y sekarang dipotong oleh headerHeight
     double yStep = (maxValue - minValue);
     double graphAreaHeight = h - headerHeight; 
 
     for (int i = 0; i <= yStep; i++) {
       double y = h - ((i / yStep) * graphAreaHeight);
+      
       bool isMajorLine = i % 5 == 0; 
       canvas.drawLine(Offset(0, y), Offset(w, y), isMajorLine ? heavyGridPaint : gridPaint);
-      if (isMajorLine || i % 1 == 0) { 
-        final tp = TextPainter(text: TextSpan(text: "${(minValue + i).toInt()}", style: isMajorLine ? boldTextStyle : textStyle), textDirection: TextDirection.ltr)..layout();
-        tp.paint(canvas, Offset(-25, y - (tp.height / 2)));
+      
+      if (isMajorLine) { 
+        final tp = TextPainter(text: TextSpan(text: "${(minValue + i).toInt()}", style: boldTextStyle), textDirection: TextDirection.ltr)..layout();
+        tp.paint(canvas, Offset(-30, y - (tp.height / 2))); 
       }
     }
 
-    final yAxisLabel = TextPainter(text: TextSpan(text: isBerat ? "Berat (kg)" : "Tinggi (cm)", style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.black, fontSize: 12)), textDirection: TextDirection.ltr)..layout();
+    final yAxisLabel = TextPainter(text: TextSpan(text: isBerat ? "Berat (kg)" : "Tinggi (cm)", style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.black, fontSize: 13)), textDirection: TextDirection.ltr)..layout();
     canvas.save();
-    canvas.translate(-45, headerHeight + (graphAreaHeight / 2) + (yAxisLabel.width/2));
+    canvas.translate(-65, headerHeight + (graphAreaHeight / 2) + (yAxisLabel.width/2));
     canvas.rotate(-pi / 2);
     yAxisLabel.paint(canvas, const Offset(0, 0));
     canvas.restore();
@@ -332,8 +374,8 @@ class BukuKmsPainter extends CustomPainter {
     double boxHeight = 25.0;
     double startYBoxes = h + 10;
     
-    _drawText(canvas, "Umur (Bulan)", Offset(-75, startYBoxes + 6), boldTextStyle);
-    if (isBerat) _drawText(canvas, "Keterangan", Offset(-75, startYBoxes + boxHeight + 6), boldTextStyle);
+    _drawText(canvas, "Umur (Bulan)", Offset(-90, startYBoxes + 6), boldTextStyle);
+    if (isBerat) _drawText(canvas, "Keterangan", Offset(-90, startYBoxes + boxHeight + 6), boldTextStyle);
 
     for (int i = 0; i <= maxAge; i++) {
       double x = (i / maxAge) * w;
@@ -343,24 +385,62 @@ class BukuKmsPainter extends CustomPainter {
       canvas.drawLine(Offset(x, headerHeight), Offset(x, h), isYearLine ? heavyGridPaint : gridPaint);
 
       if (i < maxAge) {
+        // Gambar kotak bulan
         final rectBulan = Rect.fromLTWH(x, startYBoxes, colWidth, boxHeight);
         canvas.drawRect(rectBulan, Paint()..color = Colors.white..style = PaintingStyle.fill);
         canvas.drawRect(rectBulan, Paint()..color = Colors.black54..style = PaintingStyle.stroke..strokeWidth = 1);
         final tpBulan = TextPainter(text: TextSpan(text: "$i", style: boldTextStyle), textDirection: TextDirection.ltr)..layout();
         tpBulan.paint(canvas, Offset(x + (colWidth / 2) - (tpBulan.width / 2), startYBoxes + 6));
 
+        // Gambar kotak Keterangan ASI / Balita
         if (isBerat) {
           final rectKeterangan = Rect.fromLTWH(x, startYBoxes + boxHeight, colWidth, boxHeight);
-          canvas.drawRect(rectKeterangan, Paint()..color = (i < 6) ? const Color(0xFFFFF9C4) : Colors.white..style = PaintingStyle.fill);
+          
+          Color boxColor = Colors.white; // Default untuk bulan 24 ke atas (putih)
+          
+          // --- LOGIKA WARNA FADE (PUYEH) SESUAI JURNAL HINGGA 2 TAHUN ---
+          if (i < 6) {
+             // Bulan 0-5 (Masa ASI Eksklusif): Warna Pink Gelap/Solid
+             boxColor = const Color(0xFFF48FB1); // Pink pekat
+          } else if (i < 24) {
+             // Bulan 6-23 (Masa Melanjutkan ASI + MPASI): Tambah puyeh/pudar perlahan tiap bulan.
+             // Kita hitung opacity (kepekaan warna) perlahan mengecil dari bulan 6 ke bulan 23.
+             double fadeOpacity = 1.0 - ((i - 6) / (24 - 6)) * 0.85; 
+             boxColor = const Color(0xFFF48FB1).withOpacity(fadeOpacity.clamp(0.15, 1.0)); // Pink pudar dinamis
+          }
+
+          canvas.drawRect(rectKeterangan, Paint()..color = boxColor..style = PaintingStyle.fill);
           canvas.drawRect(rectKeterangan, Paint()..color = Colors.black54..style = PaintingStyle.stroke..strokeWidth = 1);
         }
       }
     }
 
+    // Teks motivasi panjang membentang dari bulan 0 sampai bulan 24 (2 tahun)
     if (isBerat) {
-      double asiWidth = (6 / maxAge) * w;
-      final tpAsi = TextPainter(text: const TextSpan(text: "LULUS ASI EKSKLUSIF", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 10, color: Colors.orange, letterSpacing: 1.5)), textDirection: TextDirection.ltr)..layout();
-      tpAsi.paint(canvas, Offset((asiWidth / 2) - (tpAsi.width / 2), startYBoxes + boxHeight + 6));
+      double asiWidth = (24 / maxAge) * w; // Membentang 2 tahun penuh
+      String textMotivasi = "ASI EKSKLUSIF (0-6 BLN) & LANJUT MENYUSUI HINGGA 2 TAHUN. AYO IBU SEMANGAT BERIKAN HAK TERBAIK ANAK!";
+      
+      double currentFontSize = 10.0;
+      TextPainter tpAsi;
+      
+      // Auto-resize font jika ternyata layar handphone kurang lebar
+      while (true) {
+        tpAsi = TextPainter(
+          text: TextSpan(
+            text: textMotivasi, 
+            style: TextStyle(fontWeight: FontWeight.bold, fontSize: currentFontSize, color: Colors.pink.shade900)
+          ), 
+          textDirection: TextDirection.ltr
+        )..layout();
+
+        if (tpAsi.width > asiWidth - 10 && currentFontSize > 5.0) {
+          currentFontSize -= 0.5;
+        } else {
+          break; 
+        }
+      }
+
+      tpAsi.paint(canvas, Offset((asiWidth / 2) - (tpAsi.width / 2), startYBoxes + boxHeight + ((boxHeight - tpAsi.height) / 2)));
     }
   }
 

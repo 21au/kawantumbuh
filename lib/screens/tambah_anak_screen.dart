@@ -23,7 +23,7 @@ class _TambahAnakScreenState extends State<TambahAnakScreen> {
   
   String _genderPilihan = 'Laki-laki'; 
   DateTime? _tanggalPengukuran;
-  DateTime? _tanggalLahir; // Variabel baru untuk Tanggal Lahir
+  DateTime? _tanggalLahir; 
   bool _isLoading = false;
 
   @override
@@ -36,31 +36,45 @@ class _TambahAnakScreenState extends State<TambahAnakScreen> {
     super.dispose();
   }
 
-  // Fungsi Pilihan Tanggal (Dibuat lebih fleksibel untuk 2 input berbeda)
+  // --- FUNGSI BARU: Hitung Usia dalam Bulan ---
+  int _hitungUsiaBulan(DateTime birthDate) {
+    final today = DateTime.now();
+    int months = (today.year - birthDate.year) * 12 + today.month - birthDate.month;
+    if (today.day < birthDate.day) {
+      months--;
+    }
+    return months < 0 ? 0 : months;
+  }
+
+  // Fungsi Pilihan Tanggal
   Future<void> _pilihTanggal(BuildContext context, {required bool isTanggalLahir}) async {
     final DateTime? picked = await showDatePicker(
       context: context,
       initialDate: DateTime.now(),
-      firstDate: DateTime(2015), // Batas tahun mundur
-      lastDate: DateTime.now(), // Tidak bisa pilih tanggal masa depan
+      firstDate: DateTime(2015), 
+      lastDate: DateTime.now(), 
       builder: (context, child) {
         return Theme(
           data: Theme.of(context).copyWith(
             colorScheme: ColorScheme.light(
-              primary: navyDark, // Warna header & tombol aktif
-              onPrimary: softPink, // Warna teks di atas primary
-              surface: softPink, // Background kalender
-              onSurface: navyDark, // Teks angka kalender
+              primary: navyDark, 
+              onPrimary: softPink, 
+              surface: softPink, 
+              onSurface: navyDark, 
             ),
           ),
           child: child!,
         );
       },
     );
+    
     if (picked != null) {
       setState(() {
         if (isTanggalLahir) {
           _tanggalLahir = picked;
+          // --- LOGIK OTOMATIS HITUNG USIA ---
+          int usiaBulan = _hitungUsiaBulan(picked);
+          _usiaController.text = usiaBulan.toString(); // Masukkan hasil hitung ke controller
         } else {
           _tanggalPengukuran = picked;
         }
@@ -76,7 +90,6 @@ class _TambahAnakScreenState extends State<TambahAnakScreen> {
       return;
     }
 
-    // Validasi Tanggal Lahir
     if (_tanggalLahir == null) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: const Text("Mohon pilih tanggal lahir si kecil!"), backgroundColor: highlightPink),
@@ -97,7 +110,6 @@ class _TambahAnakScreenState extends State<TambahAnakScreen> {
       final user = Supabase.instance.client.auth.currentUser;
       if (user == null) throw Exception("Sesi login tidak ditemukan.");
 
-      // Format ke String "YYYY-MM-DD" untuk Supabase
       String formatTglPengukuran = "${_tanggalPengukuran!.year}-${_tanggalPengukuran!.month.toString().padLeft(2, '0')}-${_tanggalPengukuran!.day.toString().padLeft(2, '0')}";
       String formatTglLahir = "${_tanggalLahir!.year}-${_tanggalLahir!.month.toString().padLeft(2, '0')}-${_tanggalLahir!.day.toString().padLeft(2, '0')}";
 
@@ -106,8 +118,6 @@ class _TambahAnakScreenState extends State<TambahAnakScreen> {
       double? tinggiAngka = double.tryParse(_tinggiController.text.trim().replaceAll(',', '.'));
       double? lingkarKepalaAngka = double.tryParse(_lingkarKepalaController.text.trim().replaceAll(',', '.'));
 
-      // 1. PROSES SIMPAN KE TABEL 'anak' 
-      // Menggunakan .select().single() agar kita mendapat 'id' anak yang baru terbuat
       final responseAnak = await Supabase.instance.client.from('anak').insert({
         'user_id': user.id,
         'nama': _namaController.text.trim(),
@@ -120,10 +130,8 @@ class _TambahAnakScreenState extends State<TambahAnakScreen> {
         'tanggal_pengukuran': formatTglPengukuran,
       }).select().single();
 
-      // Ambil ID anak dari response
       final String idAnakBaru = responseAnak['id'].toString();
 
-      // 2. PROSES SIMPAN KE TABEL 'pertumbuhan' SEBAGAI DATA AWAL (Untuk Prophet)
       await Supabase.instance.client.from('pertumbuhan').insert({
         'anak_id': idAnakBaru,
         'tanggal_pengukuran': formatTglPengukuran,
@@ -173,7 +181,6 @@ class _TambahAnakScreenState extends State<TambahAnakScreen> {
             _buildInputLabel("Nama Lengkap Anak"),
             _buildTextField(_namaController, "Masukkan nama anak", Icons.person_outline),
             
-            // --- BAGIAN TANGGAL LAHIR ---
             _buildInputLabel("Tanggal Lahir"),
             _buildDatePicker(
               tanggal: _tanggalLahir, 
@@ -181,10 +188,10 @@ class _TambahAnakScreenState extends State<TambahAnakScreen> {
               onTap: () => _pilihTanggal(context, isTanggalLahir: true)
             ),
             
-            _buildInputLabel("Usia (dalam Bulan)"),
-            _buildTextField(_usiaController, "Contoh: 18", Icons.cake_outlined, isNumber: true),
+            // --- KOLOM USIA (OTOMATIS & READ ONLY) ---
+            _buildInputLabel("Usia (Otomatis dalam Bulan)"),
+            _buildTextField(_usiaController, "Terisi otomatis", Icons.cake_outlined, isNumber: true, readOnly: true),
 
-            // --- BAGIAN TANGGAL PENGUKURAN ---
             _buildInputLabel("Tanggal Pengukuran Terakhir"),
             _buildDatePicker(
               tanggal: _tanggalPengukuran, 
@@ -285,7 +292,6 @@ class _TambahAnakScreenState extends State<TambahAnakScreen> {
     );
   }
 
-  // --- WIDGET HELPER ---
   Widget _buildInputLabel(String label) {
     return Padding(
       padding: const EdgeInsets.only(top: 20, bottom: 8),
@@ -296,9 +302,11 @@ class _TambahAnakScreenState extends State<TambahAnakScreen> {
     );
   }
 
-  Widget _buildTextField(TextEditingController controller, String hint, IconData icon, {bool isNumber = false}) {
+  // --- UPDATE: Menambahkan properti readOnly di _buildTextField ---
+  Widget _buildTextField(TextEditingController controller, String hint, IconData icon, {bool isNumber = false, bool readOnly = false}) {
     return TextField(
       controller: controller,
+      readOnly: readOnly, // TextField bisa dikunci
       style: TextStyle(color: navyDark, fontWeight: FontWeight.w500),
       keyboardType: isNumber ? const TextInputType.numberWithOptions(decimal: true) : TextInputType.text,
       decoration: InputDecoration(
@@ -306,7 +314,7 @@ class _TambahAnakScreenState extends State<TambahAnakScreen> {
         hintStyle: TextStyle(color: navyDark.withOpacity(0.4), fontSize: 13),
         prefixIcon: Icon(icon, color: navyDark.withOpacity(0.7)),
         filled: true,
-        fillColor: fieldPink.withOpacity(0.5), 
+        fillColor: readOnly ? Colors.grey.shade300 : fieldPink.withOpacity(0.5), // Warna dibedakan sedikit kalau readOnly
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(15),
           borderSide: BorderSide.none,
