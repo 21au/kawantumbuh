@@ -24,9 +24,11 @@ class GrafikLengkapScreen extends StatefulWidget {
 
 class _GrafikLengkapScreenState extends State<GrafikLengkapScreen> {
   late Color kmsBackground;
+  
+  // Warna KMS pekat
   final Color zoneGreenDark = const Color(0xFF4CAF50);
   final Color zoneGreenLight = const Color(0xFF81C784);
-  final Color zoneYellow = const Color(0xFFFFD54F);
+  final Color zoneYellow = const Color(0xFFF7C300); 
   final Color zoneRedLine = const Color(0xFFD32F2F);
 
   List<Map<String, double>> plottedPoints = [];
@@ -385,28 +387,21 @@ class BukuKmsPainter extends CustomPainter {
       canvas.drawLine(Offset(x, headerHeight), Offset(x, h), isYearLine ? heavyGridPaint : gridPaint);
 
       if (i < maxAge) {
-        // Gambar kotak bulan
         final rectBulan = Rect.fromLTWH(x, startYBoxes, colWidth, boxHeight);
         canvas.drawRect(rectBulan, Paint()..color = Colors.white..style = PaintingStyle.fill);
         canvas.drawRect(rectBulan, Paint()..color = Colors.black54..style = PaintingStyle.stroke..strokeWidth = 1);
         final tpBulan = TextPainter(text: TextSpan(text: "$i", style: boldTextStyle), textDirection: TextDirection.ltr)..layout();
         tpBulan.paint(canvas, Offset(x + (colWidth / 2) - (tpBulan.width / 2), startYBoxes + 6));
 
-        // Gambar kotak Keterangan ASI / Balita
         if (isBerat) {
           final rectKeterangan = Rect.fromLTWH(x, startYBoxes + boxHeight, colWidth, boxHeight);
+          Color boxColor = Colors.white; 
           
-          Color boxColor = Colors.white; // Default untuk bulan 24 ke atas (putih)
-          
-          // --- LOGIKA WARNA FADE (PUYEH) SESUAI JURNAL HINGGA 2 TAHUN ---
           if (i < 6) {
-             // Bulan 0-5 (Masa ASI Eksklusif): Warna Pink Gelap/Solid
-             boxColor = const Color(0xFFF48FB1); // Pink pekat
+             boxColor = const Color(0xFFF48FB1); 
           } else if (i < 24) {
-             // Bulan 6-23 (Masa Melanjutkan ASI + MPASI): Tambah puyeh/pudar perlahan tiap bulan.
-             // Kita hitung opacity (kepekaan warna) perlahan mengecil dari bulan 6 ke bulan 23.
              double fadeOpacity = 1.0 - ((i - 6) / (24 - 6)) * 0.85; 
-             boxColor = const Color(0xFFF48FB1).withOpacity(fadeOpacity.clamp(0.15, 1.0)); // Pink pudar dinamis
+             boxColor = const Color(0xFFF48FB1).withOpacity(fadeOpacity.clamp(0.15, 1.0)); 
           }
 
           canvas.drawRect(rectKeterangan, Paint()..color = boxColor..style = PaintingStyle.fill);
@@ -415,15 +410,13 @@ class BukuKmsPainter extends CustomPainter {
       }
     }
 
-    // Teks motivasi panjang membentang dari bulan 0 sampai bulan 24 (2 tahun)
     if (isBerat) {
-      double asiWidth = (24 / maxAge) * w; // Membentang 2 tahun penuh
+      double asiWidth = (24 / maxAge) * w; 
       String textMotivasi = "ASI EKSKLUSIF (0-6 BLN) & LANJUT MENYUSUI HINGGA 2 TAHUN. AYO IBU SEMANGAT BERIKAN HAK TERBAIK ANAK!";
       
       double currentFontSize = 10.0;
       TextPainter tpAsi;
       
-      // Auto-resize font jika ternyata layar handphone kurang lebar
       while (true) {
         tpAsi = TextPainter(
           text: TextSpan(
@@ -458,17 +451,29 @@ class BukuKmsPainter extends CustomPainter {
       return Offset(x, y);
     }
 
-    List<Offset> linePlus3SD = [], linePlus2SD = [], lineMedian = [], lineMinus2SD = [], lineMinus3SD = [];
+    // 6 Garis batas untuk membuat 5 Pita Area yang TEBAL
+    List<Offset> linePlus3SD = [], linePlus2SD = [], linePlus1SD = [];
+    List<Offset> lineMinus1SD = [], lineMinus2SD = [], lineMinus3SD = [];
 
     for (int month = 0; month <= maxAge; month++) {
-      double baseGrowth = isBerat ? 3.2 + (month * 0.4) - (month * month * 0.003) : 50.0 + (month * 1.5) - (month * month * 0.008); 
-      double sdVariance = isBerat ? (1.5 + (month * 0.03)) : (4.0 + (month * 0.1));
+      // Base growth direvisi sedikit agar pas di tengah-tengah rentang standar KIA
+      double baseGrowth = isBerat 
+          ? 3.3 + (1.8 * sqrt(month)) + (0.015 * month)  
+          : 50.0 + (7.0 * sqrt(month)) + (0.08 * month); 
+      
+      // Variansi dilebarkan drastis menggunakan fungsi sqrt agar pita sangat tebal memenuhi grid
+      double sdVariance = isBerat 
+          ? 0.6 + (0.25 * sqrt(month)) 
+          : 2.0 + (0.5 * sqrt(month));
 
-      linePlus3SD.add(getCoord(month.toDouble(), baseGrowth + (sdVariance * 3)));
-      linePlus2SD.add(getCoord(month.toDouble(), baseGrowth + (sdVariance * 1.5)));
-      lineMedian.add(getCoord(month.toDouble(), baseGrowth));
-      lineMinus2SD.add(getCoord(month.toDouble(), baseGrowth - (sdVariance * 1.5)));
-      lineMinus3SD.add(getCoord(month.toDouble(), baseGrowth - (sdVariance * 2.5)));
+      // Multiplier ditarik lebar ke atas dan ke bawah
+      linePlus3SD.add(getCoord(month.toDouble(), baseGrowth + (sdVariance * 3.5)));
+      linePlus2SD.add(getCoord(month.toDouble(), baseGrowth + (sdVariance * 2.0)));
+      linePlus1SD.add(getCoord(month.toDouble(), baseGrowth + (sdVariance * 0.6))); // Batas atas Hijau Tua
+      
+      lineMinus1SD.add(getCoord(month.toDouble(), baseGrowth - (sdVariance * 0.6))); // Batas bawah Hijau Tua
+      lineMinus2SD.add(getCoord(month.toDouble(), baseGrowth - (sdVariance * 2.0)));
+      lineMinus3SD.add(getCoord(month.toDouble(), baseGrowth - (sdVariance * 3.5)));
     }
 
     void drawZone(List<Offset> topList, List<Offset> bottomList, Color color) {
@@ -480,11 +485,14 @@ class BukuKmsPainter extends CustomPainter {
       canvas.drawPath(path, Paint()..color = color..style = PaintingStyle.fill);
     }
 
-    drawZone(linePlus3SD, linePlus2SD, const Color(0xFFFFD54F)); 
-    drawZone(linePlus2SD, lineMedian, const Color(0xFF81C784));  
-    drawZone(lineMedian, lineMinus2SD, const Color(0xFF4CAF50)); 
-    drawZone(lineMinus2SD, lineMinus3SD, const Color(0xFFFFD54F));
+    // 5 Lapis Pita Lebar persis seperti Buku KMS
+    drawZone(linePlus3SD, linePlus2SD, const Color(0xFFF7C300));   // Pita Kuning Atas
+    drawZone(linePlus2SD, linePlus1SD, const Color(0xFF81C784));   // Pita Hijau Muda Atas
+    drawZone(linePlus1SD, lineMinus1SD, const Color(0xFF4CAF50));  // Pita Hijau Tua (Tengah)
+    drawZone(lineMinus1SD, lineMinus2SD, const Color(0xFF81C784)); // Pita Hijau Muda Bawah
+    drawZone(lineMinus2SD, lineMinus3SD, const Color(0xFFF7C300)); // Pita Kuning Bawah
 
+    // Garis Merah BGM di bagian paling bawah
     final redPath = Path();
     redPath.moveTo(lineMinus3SD.first.dx, lineMinus3SD.first.dy);
     for (var point in lineMinus3SD) { redPath.lineTo(point.dx, point.dy); }
@@ -495,7 +503,15 @@ class BukuKmsPainter extends CustomPainter {
       canvas.save();
       canvas.translate(bgmTextPos.dx, bgmTextPos.dy + 15);
       canvas.rotate(-0.1);
-      _drawText(canvas, "BGM (Bawah Garis Merah)", const Offset(0, 0), const TextStyle(color: Colors.red, fontWeight: FontWeight.bold, fontSize: 11));
+      
+      final tpBgm = TextPainter(
+        text: const TextSpan(
+          text: "BGM (Bawah Garis Merah)", 
+          style: TextStyle(color: Colors.red, fontWeight: FontWeight.bold, fontSize: 11)
+        ), 
+        textDirection: TextDirection.ltr
+      )..layout();
+      tpBgm.paint(canvas, const Offset(0, 0));
       canvas.restore();
     }
   }
@@ -504,9 +520,15 @@ class BukuKmsPainter extends CustomPainter {
     if (dataPoints.isEmpty) return;
     double graphAreaHeight = h - headerHeight;
 
-    final linePaint = Paint()..color = Colors.black87..strokeWidth = 3..style = PaintingStyle.stroke;
+    // Garis data anak tetap TEBAL dan HITAM
+    final linePaint = Paint()
+      ..color = Colors.black 
+      ..strokeWidth = 5 
+      ..style = PaintingStyle.stroke;
+    
+    // Titik ditambahkan outline putih tipis agar kontras menyala (seperti screenshot Anda)
     final dotOutlinePaint = Paint()..color = Colors.white..style = PaintingStyle.fill;
-    final dotPaint = Paint()..color = Colors.black..style = PaintingStyle.fill;
+    final dotPaint = Paint()..color = Colors.black..style = PaintingStyle.fill; 
 
     final path = Path();
     for (int i = 0; i < dataPoints.length; i++) {
@@ -518,8 +540,8 @@ class BukuKmsPainter extends CustomPainter {
       if (i == 0) path.moveTo(x, y);
       else path.lineTo(x, y);
 
-      canvas.drawCircle(Offset(x, y), 6, dotOutlinePaint); 
-      canvas.drawCircle(Offset(x, y), 4, dotPaint); 
+      canvas.drawCircle(Offset(x, y), 6.5, dotOutlinePaint); // Border putih
+      canvas.drawCircle(Offset(x, y), 4.5, dotPaint);        // Titik hitam pekat
     }
     canvas.drawPath(path, linePaint);
   }

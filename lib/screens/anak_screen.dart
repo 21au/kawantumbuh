@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:kawantumbuh/screens/grafik_lengkap_screen.dart';
+import 'package:kawantumbuh/screens/edit_pertumbuhan_screen.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'edit_identitas_anak_screen.dart';
 import 'catat_pertumbuhan_screen.dart';
@@ -112,15 +113,83 @@ class _AnakScreenState extends State<AnakScreen> {
     }
   }
 
-  List<double> _getChartData() {
-    if (_riwayatPertumbuhan.isEmpty) return [];
+  void _konfirmasiHapusRiwayat(String idRiwayat) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        backgroundColor: softPink,
+        title: Text("Hapus Data?", style: TextStyle(color: navyDark, fontWeight: FontWeight.bold)),
+        content: Text("Data pengukuran ini akan dihapus permanen.", style: TextStyle(color: navyDark)),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text("Batal", style: TextStyle(color: Colors.grey)),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(backgroundColor: Colors.redAccent),
+            onPressed: () async {
+              Navigator.pop(context);
+              await _hapusDataSupabase(idRiwayat);
+            },
+            child: const Text("Hapus", style: TextStyle(color: Colors.white)),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _hapusDataSupabase(String idRiwayat) async {
+    try {
+      setState(() => _isLoading = true);
+      await Supabase.instance.client.from('pertumbuhan').delete().eq('id', idRiwayat);
+      
+      _fetchRiwayat(selectedIndex);
+      
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text("Data berhasil dihapus!"), backgroundColor: Colors.green),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() => _isLoading = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text("Gagal menghapus: $e"), backgroundColor: Colors.red),
+        );
+      }
+    }
+  }
+
+  // UPDATE: Get Chart Data dengan Umur Bulan Saat Pengukuran
+  List<Map<String, double>> _getChartData(String? tglLahir) {
+    if (_riwayatPertumbuhan.isEmpty || tglLahir == null) return [];
     
-    var recentData = _riwayatPertumbuhan.take(60).toList();
+    DateTime birthDate;
+    try {
+      birthDate = DateTime.parse(tglLahir);
+    } catch (e) {
+      return [];
+    }
+
+    var recentData = _riwayatPertumbuhan.toList();
     recentData = recentData.reversed.toList(); 
 
     return recentData.map((e) {
       var val = isBeratBadan ? e['berat_badan'] : e['tinggi_badan'];
-      return double.tryParse(val.toString()) ?? 0.0;
+      double parsedVal = double.tryParse(val.toString()) ?? 0.0;
+      
+      DateTime measureDate;
+      try {
+        measureDate = DateTime.parse(e['tanggal_pengukuran'].toString());
+      } catch (_) {
+        measureDate = DateTime.now();
+      }
+      
+      int ageMonths = (measureDate.year - birthDate.year) * 12 + measureDate.month - birthDate.month;
+      if (measureDate.day < birthDate.day) ageMonths--; 
+      if (ageMonths < 0) ageMonths = 0;
+
+      return {'umur': ageMonths.toDouble(), 'nilai': parsedVal};
     }).toList();
   }
 
@@ -153,7 +222,7 @@ class _AnakScreenState extends State<AnakScreen> {
                 padding: const EdgeInsets.symmetric(horizontal: 20),
                 child: Column(
                   children: [
-                    _buildDynamicChartCard(),
+                    _buildDynamicChartCard(currentChild),
                     const SizedBox(height: 20),
                     _buildStatusPertumbuhan(currentChild['nama'] ?? "Si Kecil"),
                     const SizedBox(height: 20),
@@ -179,19 +248,16 @@ class _AnakScreenState extends State<AnakScreen> {
     bool isInvalid = rawStatus.isEmpty || 
                      rawStatus.toLowerCase().contains("gagal") || 
                      rawStatus.toLowerCase().contains("luar jangkauan");
-
-    String judul = "💡 Hasil Analisis & Prediksi AI";
+    String judul = "💡 Hasil Analisis & Prediksi";
     String pesan = "";
     Color boxColor = fieldPink;
     IconData iconData = Icons.analytics_outlined;
-
     if (isInvalid) {
-      pesan = "Data belum cukup untuk prediksi AI (Minimal 3 data). Yuk, rutin catat pertumbuhan $name setiap bulan!";
+      pesan = "Data belum cukup untuk prediksi (Minimal 3 data). Yuk, rutin catat pertumbuhan $name setiap bulan!";
       boxColor = Colors.orangeAccent.withOpacity(0.3);
     } else {
       String statusLower = rawStatus.toLowerCase();
-      
-      pesan = "Berdasarkan tren grafik $name, AI memprediksi status gizinya bulan depan berpotensi mengarah ke: *$rawStatus*.\n\n";
+      pesan = "Berdasarkan tren grafik $name, Prediksi status gizinya bulan depan berpotensi mengarah ke: *$rawStatus*.\n\n";
 
       if (statusLower.contains("normal") || statusLower.contains("baik")) {
         boxColor = successGreen.withOpacity(0.6);
@@ -210,7 +276,6 @@ class _AnakScreenState extends State<AnakScreen> {
         pesan += "Saran untuk Bunda:\nTetap pantau kurva pertumbuhannya dengan teliti dan konsultasikan dengan tenaga kesehatan di Posyandu/Klinik terdekat.";
       }
     }
-
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(20),
@@ -234,7 +299,6 @@ class _AnakScreenState extends State<AnakScreen> {
 
   Widget _buildPrediksiGizi() {
     String status = _prediksiTerbaru?['status_gizi'] ?? "Menunggu Data";
-
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(color: fieldPink, borderRadius: BorderRadius.circular(20)),
@@ -250,7 +314,7 @@ class _AnakScreenState extends State<AnakScreen> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text("Prediksi Status Gizi", style: TextStyle(color: navyDark, fontWeight: FontWeight.bold, fontSize: 16)),
-                    Text("Berdasarkan perhitungan Z-Score AI", style: TextStyle(color: navyDark.withOpacity(0.5), fontSize: 11)),
+                    Text("Berdasarkan perhitungan Z-Score", style: TextStyle(color: navyDark.withOpacity(0.5), fontSize: 11)),
                   ],
                 ),
               ),
@@ -348,8 +412,10 @@ class _AnakScreenState extends State<AnakScreen> {
 
   Widget _buildMainCard(Map<String, dynamic> child) {
     final String tanggalLahir = _formatTanggal(child['tanggal_lahir']);
-    final int bulanUmur = _hitungUmurBulan(child['tanggal_lahir']);
-
+    final int bulanUmur = _hitungUmurBulan(child['tanggal_lahir']); 
+    bool isPerempuan = (child['jenis_kelamin'] ?? '').toString().toLowerCase().contains('p');
+    IconData genderIcon = isPerempuan ? Icons.girl : Icons.boy;
+    
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(color: softPink.withOpacity(0.50), borderRadius: BorderRadius.circular(20)),
@@ -360,7 +426,7 @@ class _AnakScreenState extends State<AnakScreen> {
               Container(
                   padding: const EdgeInsets.all(12),
                   decoration: BoxDecoration(color: highlightPink, shape: BoxShape.circle),
-                  child: Icon(Icons.face_retouching_natural, color: softPink, size: 35)),
+                  child: Icon(genderIcon, color: softPink, size: 35)),
               const SizedBox(width: 15),
               Expanded(
                 child: Column(
@@ -451,8 +517,8 @@ class _AnakScreenState extends State<AnakScreen> {
     );
   }
 
-  Widget _buildDynamicChartCard() {
-    List<double> chartData = _getChartData();
+  Widget _buildDynamicChartCard(Map<String, dynamic> currentChild) {
+    List<Map<String, double>> chartData = _getChartData(currentChild['tanggal_lahir']);
 
     return Container(
       width: double.infinity,
@@ -485,8 +551,8 @@ class _AnakScreenState extends State<AnakScreen> {
           LayoutBuilder(
             builder: (context, constraints) {
               return GestureDetector(
-                onPanDown: (details) => _handleTouch(details.localPosition.dx, constraints.maxWidth, chartData.length),
-                onTapDown: (details) => _handleTouch(details.localPosition.dx, constraints.maxWidth, chartData.length),
+                onPanDown: (details) => _handleTouch(details.localPosition.dx, constraints.maxWidth, chartData),
+                onTapDown: (details) => _handleTouch(details.localPosition.dx, constraints.maxWidth, chartData),
                 child: Container(
                   padding: const EdgeInsets.only(left: 10, right: 10, bottom: 5),
                   decoration: BoxDecoration(
@@ -499,7 +565,7 @@ class _AnakScreenState extends State<AnakScreen> {
                   width: double.infinity,
                   child: CustomPaint(
                     size: Size.infinite,
-                    painter: DynamicChartPainter(navyDark, chartData, isBeratBadan, _touchedIndex),
+                    painter: DynamicChartPainter(chartData, isBeratBadan, _touchedIndex),
                   ),
                 ),
               );
@@ -531,20 +597,19 @@ class _AnakScreenState extends State<AnakScreen> {
             runSpacing: 10, 
             children: [
               SizedBox(width: 140, child: _buildLegendItem(const Color(0xFF4CAF50), "Hijau: Normal")),
-              SizedBox(width: 140, child: _buildLegendItem(const Color(0xFFFFEB3B), "Kuning: Waspada")),
-              SizedBox(width: 140, child: _buildLegendItem(const Color(0xFFF44336), "Merah: Konsultasi")),
-              SizedBox(width: 140, child: _buildLegendItem(navyDark, "Titik: Data Anak")),
+              SizedBox(width: 140, child: _buildLegendItem(const Color(0xFF81C784), "Hijau Muda: Waspada")),
+              SizedBox(width: 140, child: _buildLegendItem(const Color(0xFFF7C300), "Kuning: Risiko")),
+              SizedBox(width: 140, child: _buildLegendItem(Colors.black, "Hitam: Data Anak")),
             ],
           ),
           
           const SizedBox(height: 20),
           
-          // --- TOMBOL MENUJU HALAMAN GRAFIK LENGKAP ---
           SizedBox(
             width: double.infinity,
             child: ElevatedButton.icon(
               onPressed: () {
-                final currentChild = _daftarAnak[selectedIndex]; // Ambil data anak aktif
+                final currentChild = _daftarAnak[selectedIndex]; 
 
                 Navigator.push(
                   context, 
@@ -579,16 +644,25 @@ class _AnakScreenState extends State<AnakScreen> {
     );
   }
 
-  void _handleTouch(double dx, double maxWidth, int dataLength) {
-    if (dataLength <= 0) return;
-    double xStep = dataLength > 1 ? maxWidth / (dataLength - 1) : maxWidth / 2;
-    int index = (dx / xStep).round();
+  void _handleTouch(double dx, double maxWidth, List<Map<String, double>> chartData) {
+    if (chartData.isEmpty) return;
     
-    if (index >= 0 && index < dataLength) {
-      setState(() {
-        _touchedIndex = index;
-      });
+    // Cari index terdekat dengan titik sentuh x
+    double tapAge = (dx / maxWidth) * 60; // 60 adalah maxAge
+    int closestIndex = 0;
+    double minDiff = double.infinity;
+    
+    for (int i = 0; i < chartData.length; i++) {
+      double diff = (chartData[i]['umur']! - tapAge).abs();
+      if (diff < minDiff) {
+        minDiff = diff;
+        closestIndex = i;
+      }
     }
+    
+    setState(() {
+      _touchedIndex = closestIndex;
+    });
   }
 
   Widget _buildLegendItem(Color color, String label) {
@@ -627,21 +701,24 @@ class _AnakScreenState extends State<AnakScreen> {
   }
 
   Widget _buildRiwayatList() {
-    if (_riwayatPertumbuhan.isEmpty) return Center(child: Padding(padding: const EdgeInsets.all(20.0), child: Text("Belum ada riwayat pengukuran.", style: TextStyle(color: navyDark))));
-    
+    if (_riwayatPertumbuhan.isEmpty) {
+      return Center(child: Padding(padding: const EdgeInsets.all(20.0), child: Text("Belum ada riwayat pengukuran.", style: TextStyle(color: navyDark))));
+    }  
     return Column(
       children: _riwayatPertumbuhan.map((r) => _buildRiwayatCard(
+        r['id'].toString(), 
         _formatTanggal(r['tanggal_pengukuran']?.toString()), 
         "${r['berat_badan']} kg", 
-        "${r['tinggi_badan']} cm"
+        "${r['tinggi_badan']} cm",
+        r
       )).toList(),
     );
   }
 
-  Widget _buildRiwayatCard(String date, String bb, String tb) {
+  Widget _buildRiwayatCard(String id, String date, String bb, String tb, Map<String, dynamic> rawData) {
     return Container(
       margin: const EdgeInsets.only(bottom: 10),
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
       decoration: BoxDecoration(color: fieldPink, borderRadius: BorderRadius.circular(15)),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -655,15 +732,34 @@ class _AnakScreenState extends State<AnakScreen> {
               Text("TB: $tb", style: TextStyle(color: navyDark, fontWeight: FontWeight.bold)),
             ])
           ]),
-          Stack(
-            alignment: Alignment.center,
+          Row(
             children: [
-              Container(width: 12, height: 12, decoration: const BoxDecoration(color: Colors.white, shape: BoxShape.circle)),
-              Icon(Icons.check_circle, color: Colors.green.shade600, size: 26),
+              IconButton(
+                icon: const Icon(Icons.edit_note, color: Colors.orange),
+                constraints: const BoxConstraints(),
+                padding: const EdgeInsets.all(8),
+                onPressed: () async {
+                  final result = await Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => EditPertumbuhanScreen(dataPertumbuhan: rawData),
+                    ),
+                  );
+                  if (result == true) {
+                    _fetchDataAnak(); 
+                  }
+                },
+              ),
+              IconButton(
+                icon: const Icon(Icons.delete_outline, color: Colors.redAccent),
+                constraints: const BoxConstraints(),
+                padding: const EdgeInsets.all(8),
+                onPressed: () => _konfirmasiHapusRiwayat(id),
+              ),
             ],
           ),
         ],
-      ),
+      ), 
     );
   }
 
@@ -687,100 +783,148 @@ class _AnakScreenState extends State<AnakScreen> {
 }
 
 class DynamicChartPainter extends CustomPainter {
-  final Color lineColor;
-  final List<double> dataPoints;
+  final List<Map<String, double>> dataPoints;
   final bool isBerat;
   final int? touchedIndex; 
-
-  DynamicChartPainter(this.lineColor, this.dataPoints, this.isBerat, this.touchedIndex);
+  
+  DynamicChartPainter(this.dataPoints, this.isBerat, this.touchedIndex);
 
   @override
   void paint(Canvas canvas, Size size) {
     final double w = size.width;
     final double h = size.height;
 
-    _drawCurvedZone(canvas, size, const Color(0xFFFFEB3B).withOpacity(0.2), 0.1, 0.3); 
-    _drawCurvedZone(canvas, size, const Color(0xFF4CAF50).withOpacity(0.3), 0.3, 0.7); 
-    _drawCurvedZone(canvas, size, const Color(0xFFFFEB3B).withOpacity(0.2), 0.7, 0.85); 
-    _drawCurvedZone(canvas, size, const Color(0xFFF44336).withOpacity(0.2), 0.85, 1.0); 
-
-    if (dataPoints.isEmpty) return;
-
-    double maxVal = dataPoints.reduce(max) + (isBerat ? 4 : 15);
-    double minVal = (dataPoints.reduce(min) - (isBerat ? 4 : 15)).clamp(0, double.infinity);
-
-    final paintLine = Paint()
-      ..color = lineColor
-      ..strokeWidth = 3.5
-      ..strokeCap = StrokeCap.round
-      ..style = PaintingStyle.stroke;
-
-    final dotPaint = Paint()..color = lineColor..style = PaintingStyle.fill;
-    final dotOutline = Paint()..color = Colors.white..style = PaintingStyle.fill;
-
-    final path = Path();
-    double xStep = dataPoints.length > 1 ? w / (dataPoints.length - 1) : w / 2;
-
-    List<Offset> pointOffsets = [];
-
-    for (int i = 0; i < dataPoints.length; i++) {
-      double x = dataPoints.length > 1 ? i * xStep : w / 2;
-      double normalizedY = (dataPoints[i] - minVal) / (maxVal - minVal);
-      double y = h - (normalizedY * h);
-
-      if (i == 0) path.moveTo(x, y); else path.lineTo(x, y);
-      
-      pointOffsets.add(Offset(x, y));
-      
-      canvas.drawCircle(Offset(x, y), 6, dotOutline);
-      canvas.drawCircle(Offset(x, y), 4, dotPaint);
+    int maxAge = 60; // Max umur 60 Bulan (5 Tahun) untuk standar
+    double minValue = isBerat ? 0 : 40; // Batas Bawah Y
+    double maxValue = isBerat ? 25 : 125; // Batas Atas Y
+    
+    // Fungsi konversi Koordinat (Month -> X, Nilai -> Y)
+    Offset getCoord(double month, double value) {
+      double x = (month / maxAge) * w;
+      if(value < minValue) value = minValue;
+      if(value > maxValue) value = maxValue;
+      double y = h - (((value - minValue) / (maxValue - minValue)) * h);
+      return Offset(x, y);
     }
-    canvas.drawPath(path, paintLine);
 
-    if (touchedIndex != null && touchedIndex! >= 0 && touchedIndex! < dataPoints.length) {
-      final x = pointOffsets[touchedIndex!].dx;
-      final y = pointOffsets[touchedIndex!].dy;
-      final val = dataPoints[touchedIndex!];
-      
-      final textSpan = TextSpan(
-        text: "$val ${isBerat ? 'kg' : 'cm'}",
-        style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold),
-      );
-      final textPainter = TextPainter(text: textSpan, textDirection: TextDirection.ltr);
-      textPainter.layout();
+    // 1. BUAT GARIS PITA KMS
+    List<Offset> linePlus3SD = [], linePlus2SD = [], linePlus1SD = [];
+    List<Offset> lineMinus1SD = [], lineMinus2SD = [], lineMinus3SD = [];
 
-      final rectWidth = textPainter.width + 16;
-      final rectHeight = textPainter.height + 10;
-      double rectX = x - (rectWidth / 2);
-      if (rectX < 0) rectX = 0;
-      if (rectX + rectWidth > w) rectX = w - rectWidth;
+    for (int month = 0; month <= maxAge; month++) {
+      double baseGrowth = isBerat 
+          ? 3.3 + (1.8 * sqrt(month)) + (0.015 * month)  
+          : 50.0 + (7.0 * sqrt(month)) + (0.08 * month); 
       
-      final rect = Rect.fromLTWH(rectX, y - rectHeight - 10, rectWidth, rectHeight);
+      double sdVariance = isBerat 
+          ? 0.6 + (0.25 * sqrt(month)) 
+          : 2.0 + (0.5 * sqrt(month));
+
+      linePlus3SD.add(getCoord(month.toDouble(), baseGrowth + (sdVariance * 3.5)));
+      linePlus2SD.add(getCoord(month.toDouble(), baseGrowth + (sdVariance * 2.0)));
+      linePlus1SD.add(getCoord(month.toDouble(), baseGrowth + (sdVariance * 0.6))); 
       
-      canvas.drawRRect(
-        RRect.fromRectAndRadius(rect, const Radius.circular(8)),
-        Paint()..color = lineColor,
-      );
-      
-      textPainter.paint(canvas, Offset(rectX + 8, y - rectHeight - 5));
-      
-      canvas.drawCircle(Offset(x, y), 8, Paint()..color = Colors.white..style = PaintingStyle.stroke..strokeWidth = 3);
+      lineMinus1SD.add(getCoord(month.toDouble(), baseGrowth - (sdVariance * 0.6))); 
+      lineMinus2SD.add(getCoord(month.toDouble(), baseGrowth - (sdVariance * 2.0)));
+      lineMinus3SD.add(getCoord(month.toDouble(), baseGrowth - (sdVariance * 3.5)));
     }
-  }
 
-  void _drawCurvedZone(Canvas canvas, Size size, Color color, double top, double bottom) {
-    final paint = Paint()..color = color..style = PaintingStyle.fill;
-    final path = Path();
-    path.moveTo(0, size.height * bottom);
-    path.quadraticBezierTo(size.width * 0.5, size.height * (bottom - 0.1), size.width, size.height * (bottom - 0.2));
-    path.lineTo(size.width, size.height * (top - 0.2));
-    path.quadraticBezierTo(size.width * 0.5, size.height * (top - 0.1), 0, size.height * top);
-    path.close();
-    canvas.drawPath(path, paint);
+    // Fungsi Pembantu untuk Menggambar Area Pita (Zone)
+    void drawZone(List<Offset> topList, List<Offset> bottomList, Color color) {
+      final path = Path();
+      path.moveTo(topList.first.dx, topList.first.dy);
+      for (var point in topList) { path.lineTo(point.dx, point.dy); }
+      for (var point in bottomList.reversed) { path.lineTo(point.dx, point.dy); }
+      path.close();
+      canvas.drawPath(path, Paint()..color = color..style = PaintingStyle.fill);
+    }
+
+    // Gambar Area Pita Berdasarkan Warna Panduan
+    drawZone(linePlus3SD, linePlus2SD, const Color(0xFFF7C300));    // Kuning Atas
+    drawZone(linePlus2SD, linePlus1SD, const Color(0xFF81C784));    // Hijau Muda Atas
+    drawZone(linePlus1SD, lineMinus1SD, const Color(0xFF4CAF50));   // Hijau Normal
+    drawZone(lineMinus1SD, lineMinus2SD, const Color(0xFF81C784));  // Hijau Muda Bawah
+    drawZone(lineMinus2SD, lineMinus3SD, const Color(0xFFF7C300));  // Kuning Bawah
+
+    // 2. PLOT TITIK & GARIS DATA ANAK
+    if (dataPoints.isNotEmpty) {
+      final path = Path();
+      List<Offset> pointOffsets = [];
+
+      for (int i = 0; i < dataPoints.length; i++) {
+        double monthAge = dataPoints[i]['umur']!;
+        double val = dataPoints[i]['nilai']!;
+        if (monthAge > maxAge) monthAge = maxAge.toDouble();
+
+        Offset pt = getCoord(monthAge, val);
+        pointOffsets.add(pt);
+
+        if (i == 0) {
+          path.moveTo(pt.dx, pt.dy);
+        } else {
+          path.lineTo(pt.dx, pt.dy);
+        }
+      }
+
+      // Gambar Garis Sambungan
+      canvas.drawPath(path, Paint()
+        ..color = Colors.black87 
+        ..strokeWidth = 3.0 
+        ..strokeJoin = StrokeJoin.round
+        ..style = PaintingStyle.stroke);
+
+      // Gambar Lingkaran Titik & Tooltip Interaktif
+      for (int i = 0; i < pointOffsets.length; i++) {
+        var pt = pointOffsets[i];
+        
+        // Titik
+        canvas.drawCircle(pt, 5.0, Paint()..color = Colors.white..style = PaintingStyle.fill); 
+        canvas.drawCircle(pt, 3.5, Paint()..color = Colors.black87..style = PaintingStyle.fill);
+
+        // Render Tooltip jika titik disentuh
+        if (touchedIndex == i) {
+          final val = dataPoints[i]['nilai'];
+          final textSpan = TextSpan(
+            text: "$val ${isBerat ? 'kg' : 'cm'}",
+            style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold),
+          );
+          
+          final textPainter = TextPainter(text: textSpan, textDirection: TextDirection.ltr);
+          textPainter.layout();
+          
+          final rectWidth = textPainter.width + 16;
+          final rectHeight = textPainter.height + 10;
+          double rectX = pt.dx - (rectWidth / 2);
+          
+          // Agar tooltip tidak keluar layar
+          if (rectX < 0) rectX = 0;
+          if (rectX + rectWidth > size.width) rectX = size.width - rectWidth;
+          
+          final rect = Rect.fromLTWH(rectX, pt.dy - rectHeight - 12, rectWidth, rectHeight);
+          
+          // Shadow Tooltip
+          canvas.drawRRect(
+            RRect.fromRectAndRadius(rect, const Radius.circular(6)),
+            Paint()..color = Colors.black87..maskFilter = const MaskFilter.blur(BlurStyle.normal, 2),
+          );
+          
+          // Box Tooltip
+          canvas.drawRRect(
+            RRect.fromRectAndRadius(rect, const Radius.circular(6)),
+            Paint()..color = Colors.black87,
+          );
+          
+          // Text Tooltip
+          textPainter.paint(canvas, Offset(rectX + 8, pt.dy - rectHeight - 7));
+        }
+      }
+    }
   }
 
   @override
   bool shouldRepaint(covariant DynamicChartPainter oldDelegate) {
-    return oldDelegate.touchedIndex != touchedIndex || oldDelegate.dataPoints != dataPoints;
+    return oldDelegate.touchedIndex != touchedIndex || 
+           oldDelegate.isBerat != isBerat || 
+           oldDelegate.dataPoints != dataPoints;
   }
 }
