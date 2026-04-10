@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
-import 'dart:math'; // Untuk menghitung nilai max/min di grafik
+import 'dart:math';
 
 class StatistikPertumbuhanScreen extends StatefulWidget {
   final String anakId;
@@ -23,6 +23,9 @@ class _StatistikPertumbuhanScreenState extends State<StatistikPertumbuhanScreen>
   final Color fieldPink = const Color(0xFFF5CBCB);
   final Color highlightPink = const Color(0xFFEBA9A9);
   final Color brightPink = Colors.pinkAccent;
+  
+  // [DITAMBAHKAN] Warna Pita Aman WHO
+  final Color safeGreen = const Color(0xFF81C784); 
 
   bool _isLoading = true;
   List<Map<String, dynamic>> _riwayat = [];
@@ -30,6 +33,13 @@ class _StatistikPertumbuhanScreenState extends State<StatistikPertumbuhanScreen>
   
   String _kesimpulan = "";
   String _jenisKesimpulan = "Normal";
+
+  // [DITAMBAHKAN] Variabel untuk Fitur Baru
+  String _infoKBM = ""; // Evaluasi Kenaikan Berat Minimum
+  bool _butuhKonsultasi = false; // Penentu Actionable Insight
+
+  // Variabel untuk Kotak Pilihan (Batas max 5)
+  int _jumlahBulanDipilih = 2; // Default nampilin 2 bulan aja
 
   @override
   void initState() {
@@ -45,12 +55,12 @@ class _StatistikPertumbuhanScreenState extends State<StatistikPertumbuhanScreen>
           .eq('anak_id', widget.anakId)
           .order('tanggal_pengukuran', ascending: true);
 
+      // Ubah ascending: true agar data prediksi terurut maju (Bulan 1, 2, 3, dst)
       final dataPrediksi = await Supabase.instance.client
           .from('prediksi_pertumbuhan')
           .select()
           .eq('anak_id', widget.anakId)
-          .order('tanggal_prediksi', ascending: false)
-          .limit(10); 
+          .order('tanggal_prediksi', ascending: true); 
 
       if (mounted) {
         setState(() {
@@ -70,29 +80,56 @@ class _StatistikPertumbuhanScreenState extends State<StatistikPertumbuhanScreen>
     if (_riwayat.isEmpty) {
       _jenisKesimpulan = "Belum Ada Data";
       _kesimpulan = "Halo Bunda! Belum ada data ukuran nih. Yuk catat data pertama ${widget.namaAnak} supaya kita bisa pantau tumbuh kembangnya sama-sama! 💕";
+      _infoKBM = "";
+      _butuhKonsultasi = false;
       return;
     }
 
-    Map<String, dynamic>? prediksiBB;
-    try {
-      prediksiBB = _listPrediksi.firstWhere((p) => p['metrik'] == 'berat_badan');
-    } catch (e) {
-      prediksiBB = null;
-    }
+    double bbSekarang = (_riwayat.last['berat_badan'] ?? 0).toDouble();
 
-    if (prediksiBB != null) {
-      String statusGizi = prediksiBB['status_gizi'] ?? "Normal";
-      double nilaiPrediksi = double.tryParse(prediksiBB['nilai_prediksi'].toString()) ?? 0.0;
+    // Ambil semua prediksi khusus berat badan, DIBATASI sesuai dropdown
+    List<Map<String, dynamic>> prediksiBBList = _listPrediksi
+        .where((p) => p['metrik'] == 'berat_badan')
+        .take(_jumlahBulanDipilih) // <--- LOGIKA PEMBATASAN
+        .toList();
+
+    if (prediksiBBList.isNotEmpty) {
+      String statusGizi = prediksiBBList.first['status_gizi'] ?? "Normal";
+      
+      // [DITAMBAHKAN] LOGIKA KBM (Kenaikan Berat Minimum)
+      double prediksiBulanPertama = double.tryParse(prediksiBBList.first['nilai_prediksi'].toString()) ?? 0.0;
+      double selisihPrediksi = prediksiBulanPertama - bbSekarang;
+      double targetKBM = 0.2; // Asumsi KBM 200 gram
+      
+      if (selisihPrediksi >= targetKBM) {
+        _infoKBM = "Hebat! Prediksi kenaikan bulan depan (+${selisihPrediksi.toStringAsFixed(1)} kg) memenuhi target Kenaikan Berat Minimal (KBM) Kemenkes. 🎯";
+      } else if (selisihPrediksi > 0) {
+        _infoKBM = "Prediksi bulan depan naik (+${selisihPrediksi.toStringAsFixed(1)} kg), tapi belum mencapai target ideal KBM. Yuk kejar lagi! 💪";
+      } else {
+        _infoKBM = "Awas Bunda, tren menunjukkan potensi penurunan berat atau stagnan. Mari tingkatkan asupan nutrisinya! ⚠️";
+      }
+
+      List<String> teksAngka = prediksiBBList.map((e) {
+        double val = double.tryParse(e['nilai_prediksi'].toString()) ?? 0.0;
+        return "${val.toStringAsFixed(1)}";
+      }).toList();
+      String deretPrediksi = teksAngka.join(" kg ➔ ");
       
       _jenisKesimpulan = "Pantauan Gizi: $statusGizi";
       
       if (statusGizi.toLowerCase().contains('normal') || statusGizi.toLowerCase().contains('baik')) {
-        _kesimpulan = "Berdasarkan grafik WHO, pertumbuhan ${widget.namaAnak} sangat baik lho, Bun! Berdasarkan pola saat ini, bulan depan beratnya kemungkinan bisa sekitar ${nilaiPrediksi.toStringAsFixed(1)} kg. Pertahankan asupan nutrisi bergizinya ya! 💖";
+        _butuhKonsultasi = false; // [DITAMBAHKAN]
+        _kesimpulan = "Berdasarkan grafik WHO, pertumbuhan ${widget.namaAnak} sangat baik lho, Bun! Berdasarkan pola saat ini, perkiraan berat hingga $_jumlahBulanDipilih bulan ke depan adalah $deretPrediksi kg. Pertahankan asupan nutrisi bergizinya ya! 💖";
       } else {
-        _kesimpulan = "Dari catatan ini, sepertinya ada indikasi $statusGizi. Berdasarkan tren yang ada, perkiraan berat bulan depan sekitar ${nilaiPrediksi.toStringAsFixed(1)} kg. Jangan panik dulu ya Bun, mari pantau ekstra dan jadwalkan konsultasi dengan bidan atau dokter anak agar penanganannya tepat. Peluk hangat untuk Bunda! 🫂";
+        _butuhKonsultasi = true; // [DITAMBAHKAN]
+        _kesimpulan = "Dari catatan ini, sepertinya ada indikasi $statusGizi. Perkiraan berat $_jumlahBulanDipilih bulan ke depan sekitar $deretPrediksi kg. Jangan panik dulu ya Bun, mari pantau ekstra dan jadwalkan konsultasi dengan bidan atau dokter anak. Peluk hangat untuk Bunda! 🫂";
       }
       return; 
     }
+
+    // Fallback jika belum ada prediksi
+    _infoKBM = "";
+    _butuhKonsultasi = false;
 
     if (_riwayat.length == 1) {
       _jenisKesimpulan = "Awal yang Baik";
@@ -100,7 +137,6 @@ class _StatistikPertumbuhanScreenState extends State<StatistikPertumbuhanScreen>
       return;
     }
 
-    double bbSekarang = (_riwayat.last['berat_badan'] ?? 0).toDouble();
     double bbSebelumnya = (_riwayat[_riwayat.length - 2]['berat_badan'] ?? 0).toDouble();
     double selisihBB = bbSekarang - bbSebelumnya;
 
@@ -145,7 +181,17 @@ class _StatistikPertumbuhanScreenState extends State<StatistikPertumbuhanScreen>
               children: [
                 _buildInfoCard(),
                 const SizedBox(height: 25),
+                
+                // KOTAK PILIHAN PREDIKSI DI SINI
+                _buildDropdownPrediksi(), 
+                const SizedBox(height: 20),
+
                 _buildSummaryBox(),
+                
+                // [DITAMBAHKAN] Tombol Actionable Insight
+                const SizedBox(height: 15),
+                _buildActionInsight(),
+
                 const SizedBox(height: 25),
                 _buildChartContainer("Grafik Berat Badan (Kg)", true),
                 const SizedBox(height: 25),
@@ -154,6 +200,78 @@ class _StatistikPertumbuhanScreenState extends State<StatistikPertumbuhanScreen>
               ],
             ),
           ),
+    );
+  }
+
+  // [DITAMBAHKAN] WIDGET ACTIONABLE INSIGHT
+  Widget _buildActionInsight() {
+    return SizedBox(
+      width: double.infinity,
+      child: ElevatedButton.icon(
+        onPressed: () {
+          // TODO: Navigasi ke halaman artikel/konsultasi yang sesuai
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text(_butuhKonsultasi ? "Membuka halaman konsultasi..." : "Membuka ide resep makanan sehat..."))
+          );
+        },
+        style: ElevatedButton.styleFrom(
+          backgroundColor: _butuhKonsultasi ? Colors.redAccent : safeGreen,
+          padding: const EdgeInsets.symmetric(vertical: 15),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
+          elevation: 2,
+        ),
+        icon: Icon(_butuhKonsultasi ? Icons.medical_services : Icons.restaurant_menu, color: Colors.white),
+        label: Text(
+          _butuhKonsultasi ? "Jadwalkan Konsultasi Medis" : "Lihat Ide Resep Penambah Gizi",
+          style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 14),
+        ),
+      ),
+    );
+  }
+
+  // WIDGET KOTAK PILIHAN (DROPDOWN)
+  Widget _buildDropdownPrediksi() {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: highlightPink, width: 2),
+      ),
+      child: Row(
+        children: [
+          Icon(Icons.timeline, color: brightPink),
+          const SizedBox(width: 15),
+          Expanded(
+            child: Text(
+              "Tampilkan Prediksi:",
+              style: TextStyle(color: navyDark, fontWeight: FontWeight.bold),
+            ),
+          ),
+          DropdownButtonHideUnderline(
+            child: DropdownButton<int>(
+              value: _jumlahBulanDipilih,
+              icon: Icon(Icons.keyboard_arrow_down, color: navyDark),
+              dropdownColor: softPink,
+              style: TextStyle(color: navyDark, fontWeight: FontWeight.bold, fontSize: 15),
+              items: [1, 2, 3, 4, 5].map((int value) {
+                return DropdownMenuItem<int>(
+                  value: value,
+                  child: Text("$value Bulan"),
+                );
+              }).toList(),
+              onChanged: (int? newValue) {
+                if (newValue != null) {
+                  setState(() {
+                    _jumlahBulanDipilih = newValue;
+                    _tentukanKesimpulan(); // Update teks kesimpulan
+                  });
+                }
+              },
+            ),
+          ),
+        ],
+      ),
     );
   }
 
@@ -204,6 +322,33 @@ class _StatistikPertumbuhanScreenState extends State<StatistikPertumbuhanScreen>
             textAlign: TextAlign.center,
             style: TextStyle(color: softPink.withOpacity(0.9), fontSize: 13, height: 1.5),
           ),
+          
+          // [DITAMBAHKAN] INFO EVALUASI KBM
+          if (_infoKBM.isNotEmpty) ...[
+            const Padding(
+              padding: EdgeInsets.symmetric(vertical: 12),
+              child: Divider(color: Colors.white38),
+            ),
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: Colors.white.withOpacity(0.1),
+                borderRadius: BorderRadius.circular(12)
+              ),
+              child: Row(
+                children: [
+                  const Icon(Icons.analytics_outlined, color: Colors.amber, size: 20),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Text(
+                      _infoKBM,
+                      style: const TextStyle(color: Colors.white, fontSize: 12, height: 1.4),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ]
         ],
       ),
     );
@@ -219,13 +364,13 @@ class _StatistikPertumbuhanScreenState extends State<StatistikPertumbuhanScreen>
     }
 
     String targetMetrik = isBerat ? 'berat_badan' : 'tinggi_badan';
-    Map<String, dynamic>? prediksiAktif;
-    double? predictionValue;
-    try {
-      prediksiAktif = _listPrediksi.firstWhere((p) => p['metrik'] == targetMetrik);
-      predictionValue = double.tryParse(prediksiAktif['nilai_prediksi'].toString());
-    } catch (e) {
-      prediksiAktif = null;
+    
+    // Ambil titik prediksi, POTONG SESUAI DROPDOWN (.take(_jumlahBulanDipilih))
+    List<double> predictionPoints = [];
+    var metricPreds = _listPrediksi.where((p) => p['metrik'] == targetMetrik).take(_jumlahBulanDipilih).toList();
+    for(var p in metricPreds) {
+      double val = double.tryParse(p['nilai_prediksi'].toString()) ?? 0.0;
+      predictionPoints.add(val);
     }
 
     return Container(
@@ -243,13 +388,26 @@ class _StatistikPertumbuhanScreenState extends State<StatistikPertumbuhanScreen>
           
           // --- KETERANGAN SUMBU Y ---
           Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween, // [DIUBAH] untuk menampung legend WHO
             children: [
-              Icon(Icons.arrow_upward, size: 12, color: navyDark.withOpacity(0.6)),
-              const SizedBox(width: 4),
-              Text(
-                "Sumbu Y : ${isBerat ? 'Nilai Berat (Kg)' : 'Nilai Tinggi (cm)'}", 
-                style: TextStyle(color: navyDark.withOpacity(0.7), fontSize: 11, fontWeight: FontWeight.bold)
+              Row(
+                children: [
+                  Icon(Icons.arrow_upward, size: 12, color: navyDark.withOpacity(0.6)),
+                  const SizedBox(width: 4),
+                  Text(
+                    "Sumbu Y : ${isBerat ? 'Nilai Berat (Kg)' : 'Nilai Tinggi (cm)'}", 
+                    style: TextStyle(color: navyDark.withOpacity(0.7), fontSize: 11, fontWeight: FontWeight.bold)
+                  ),
+                ],
               ),
+              // [DITAMBAHKAN] LEGENDA PITA NORMAL WHO
+              Row(
+                children: [
+                  Container(width: 12, height: 12, color: safeGreen.withOpacity(0.4)),
+                  const SizedBox(width: 4),
+                  Text("Area Normal WHO", style: TextStyle(color: navyDark.withOpacity(0.7), fontSize: 10)),
+                ],
+              )
             ],
           ),
           const SizedBox(height: 10),
@@ -273,10 +431,11 @@ class _StatistikPertumbuhanScreenState extends State<StatistikPertumbuhanScreen>
                child: CustomPaint(
                  painter: PertumbuhanChartPainter(
                    historyPoints: historyPoints,
-                   predictionPoint: predictionValue,
+                   predictionPoints: predictionPoints, 
                    lineColor: navyDark,
                    dotColor: softPink,
                    predictColor: brightPink,
+                   safeColor: safeGreen, // [DITAMBAHKAN]
                    isBerat: isBerat, 
                  ),
                ),
@@ -297,7 +456,7 @@ class _StatistikPertumbuhanScreenState extends State<StatistikPertumbuhanScreen>
             ],
           ),
 
-          if (prediksiAktif != null && predictionValue != null) ...[
+          if (predictionPoints.isNotEmpty) ...[
             const SizedBox(height: 20),
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 15, vertical: 12),
@@ -308,7 +467,7 @@ class _StatistikPertumbuhanScreenState extends State<StatistikPertumbuhanScreen>
                   const SizedBox(width: 10),
                   Expanded(
                     child: Text(
-                      "Melihat tren pertumbuhannya, bulan depan diperkirakan bisa menyentuh angka ${predictionValue.toStringAsFixed(1)} ${isBerat ? 'kg' : 'cm'} nih, Bun.", 
+                      "Melihat tren pertumbuhannya, $_jumlahBulanDipilih bulan ke depan diperkirakan: ${predictionPoints.map((e) => e.toStringAsFixed(1)).join(" ➔ ")} ${isBerat ? 'kg' : 'cm'} nih, Bun.", 
                       style: TextStyle(color: navyDark, fontSize: 12, fontWeight: FontWeight.bold)
                     ),
                   ),
@@ -318,7 +477,7 @@ class _StatistikPertumbuhanScreenState extends State<StatistikPertumbuhanScreen>
             
             const SizedBox(height: 10), 
             
-            // --- DISCLAIMER MEDIS (Lebih Ramah) ---
+            // --- DISCLAIMER MEDIS (TIDAK HILANG LAGI) ---
             Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
@@ -347,18 +506,20 @@ class _StatistikPertumbuhanScreenState extends State<StatistikPertumbuhanScreen>
 // --- CLASS UNTUK MENGGAMBAR GRAFIK GARIS & PREDIKSI ---
 class PertumbuhanChartPainter extends CustomPainter {
   final List<double> historyPoints;
-  final double? predictionPoint;
+  final List<double> predictionPoints; 
   final Color lineColor;
   final Color dotColor;
   final Color predictColor;
+  final Color safeColor; // [DITAMBAHKAN]
   final bool isBerat;
 
   PertumbuhanChartPainter({
     required this.historyPoints, 
-    this.predictionPoint, 
+    required this.predictionPoints, 
     required this.lineColor, 
     required this.dotColor, 
     required this.predictColor,
+    required this.safeColor, // [DITAMBAHKAN]
     required this.isBerat
   });
 
@@ -366,11 +527,7 @@ class PertumbuhanChartPainter extends CustomPainter {
   void paint(Canvas canvas, Size size) {
     if (historyPoints.isEmpty) return;
 
-    // Gabungkan data historis dan prediksi untuk mencari skala (min & max)
-    List<double> allPoints = List.from(historyPoints);
-    if (predictionPoint != null) {
-      allPoints.add(predictionPoint!);
-    }
+    List<double> allPoints = [...historyPoints, ...predictionPoints];
 
     double dataMax = allPoints.reduce(max);
     double dataMin = allPoints.reduce(min);
@@ -384,14 +541,35 @@ class PertumbuhanChartPainter extends CustomPainter {
 
     List<Offset> points = [];
 
-    // Hitung kordinat setiap titik
     for (int i = 0; i < totalPoints; i++) {
       double x = totalPoints == 1 ? size.width / 2 : i * stepX;
       double y = size.height - ((allPoints[i] - minVal) / (maxVal - minVal) * size.height);
       points.add(Offset(x, y));
     }
 
-    // 1. Gambar Garis Historis (Biru Navy Solid)
+    // [DITAMBAHKAN] 1. MENGGAMBAR PITA AREA NORMAL WHO
+    final Path pitaPath = Path();
+    final double pitaMarginY = (1.5 / (maxVal - minVal)) * size.height; 
+
+    for (int i = 0; i < points.length; i++) {
+      if (i == 0) {
+        pitaPath.moveTo(points[i].dx, points[i].dy - pitaMarginY); // Batas Atas Normal
+      } else {
+        pitaPath.lineTo(points[i].dx, points[i].dy - pitaMarginY);
+      }
+    }
+    for (int i = points.length - 1; i >= 0; i--) {
+      pitaPath.lineTo(points[i].dx, points[i].dy + pitaMarginY); // Batas Bawah Normal
+    }
+    pitaPath.close();
+
+    final paintPita = Paint()
+      ..color = safeColor.withOpacity(0.3) // Hijau transparan
+      ..style = PaintingStyle.fill;
+    
+    canvas.drawPath(pitaPath, paintPita); // Digambar lebih dulu agar di layer belakang
+
+    // 2. Gambar Garis Historis
     final paintHistoryLine = Paint()
       ..color = lineColor
       ..strokeWidth = 3.0
@@ -410,8 +588,8 @@ class PertumbuhanChartPainter extends CustomPainter {
       canvas.drawPath(historyPath, paintHistoryLine);
     }
 
-    // 2. Gambar Garis Prediksi (Pink Putus-putus)
-    if (predictionPoint != null && historyPoints.isNotEmpty) {
+    // 3. Gambar Garis Prediksi
+    if (predictionPoints.isNotEmpty && historyPoints.isNotEmpty) {
       final paintPredictLine = Paint()
         ..color = predictColor
         ..strokeWidth = 2.5
@@ -419,26 +597,28 @@ class PertumbuhanChartPainter extends CustomPainter {
         ..strokeCap = StrokeCap.round;
 
       Offset startPoint = points[historyPoints.length - 1];
-      Offset endPoint = points.last;
-
-      _drawDashedLine(canvas, startPoint, endPoint, paintPredictLine);
+      
+      for (int i = 0; i < predictionPoints.length; i++) {
+        int pointIndex = historyPoints.length + i; 
+        Offset endPoint = points[pointIndex];
+        
+        _drawDashedLine(canvas, startPoint, endPoint, paintPredictLine);
+        startPoint = endPoint;
+      }
     }
 
-    // 3. Gambar Titik-Titiknya
+    // 4. Gambar Titik-Titiknya
     final paintDotOuter = Paint()..style = PaintingStyle.fill;
     final paintDotInner = Paint()..color = dotColor..style = PaintingStyle.fill;
 
     for (int i = 0; i < totalPoints; i++) {
-      bool isPredictionDot = (predictionPoint != null && i == totalPoints - 1);
-      
+      bool isPredictionDot = i >= historyPoints.length;
       paintDotOuter.color = isPredictionDot ? predictColor : lineColor;
-      
       canvas.drawCircle(points[i], isPredictionDot ? 7 : 6, paintDotOuter);
       canvas.drawCircle(points[i], 3, paintDotInner);
     }
   }
 
-  // Fungsi tambahan untuk membuat garis putus-putus (dashed line)
   void _drawDashedLine(Canvas canvas, Offset p1, Offset p2, Paint paint) {
     const double dashWidth = 6;
     const double dashSpace = 4;

@@ -160,7 +160,6 @@ class _AnakScreenState extends State<AnakScreen> {
     }
   }
 
-  // UPDATE: Get Chart Data dengan Umur Bulan Saat Pengukuran
   List<Map<String, double>> _getChartData(String? tglLahir) {
     if (_riwayatPertumbuhan.isEmpty || tglLahir == null) return [];
     
@@ -191,6 +190,27 @@ class _AnakScreenState extends State<AnakScreen> {
 
       return {'umur': ageMonths.toDouble(), 'nilai': parsedVal};
     }).toList();
+  }
+
+  void _handleTouch(double dx, double chartWidth, List<Map<String, double>> chartData) {
+    if (chartData.isEmpty) return;
+    
+    // Cari index terdekat dengan titik sentuh x berdasarkan lebar grafik (bukan layar)
+    double tapAge = (dx / chartWidth) * 60; // 60 adalah maxAge
+    int closestIndex = 0;
+    double minDiff = double.infinity;
+    
+    for (int i = 0; i < chartData.length; i++) {
+      double diff = (chartData[i]['umur']! - tapAge).abs();
+      if (diff < minDiff) {
+        minDiff = diff;
+        closestIndex = i;
+      }
+    }
+    
+    setState(() {
+      _touchedIndex = closestIndex;
+    });
   }
 
   @override
@@ -519,6 +539,7 @@ class _AnakScreenState extends State<AnakScreen> {
 
   Widget _buildDynamicChartCard(Map<String, dynamic> currentChild) {
     List<Map<String, double>> chartData = _getChartData(currentChild['tanggal_lahir']);
+    const double chartWidth = 1500.0; 
 
     return Container(
       width: double.infinity,
@@ -533,7 +554,7 @@ class _AnakScreenState extends State<AnakScreen> {
         children: [
           Text(isBeratBadan ? "Kurva Berat Badan" : "Kurva Tinggi Badan", style: TextStyle(color: navyDark, fontWeight: FontWeight.bold, fontSize: 16)),
           const SizedBox(height: 5),
-          Text("Standar Pertumbuhan Kemenkes (KIA)", style: TextStyle(color: navyDark.withOpacity(0.5), fontSize: 11)),
+          Text("Standar KIA Kemenkes (Geser ke samping untuk melihat detail 👉)", style: TextStyle(color: navyDark.withOpacity(0.7), fontSize: 11, fontStyle: FontStyle.italic)),
           const SizedBox(height: 20),
           
           Row(
@@ -541,35 +562,38 @@ class _AnakScreenState extends State<AnakScreen> {
               Icon(Icons.arrow_upward, size: 14, color: navyDark.withOpacity(0.8)),
               const SizedBox(width: 6),
               Text(
-                "Sumbu Y : ${isBeratBadan ? 'Nilai Berat (Kg)' : 'Nilai Tinggi (cm)'}", 
+                "Y : ${isBeratBadan ? 'Berat (Kg)' : 'Tinggi (cm)'}", 
                 style: TextStyle(color: navyDark, fontSize: 12, fontWeight: FontWeight.w700)
               ),
             ],
           ),
           const SizedBox(height: 12),
           
-          LayoutBuilder(
-            builder: (context, constraints) {
-              return GestureDetector(
-                onPanDown: (details) => _handleTouch(details.localPosition.dx, constraints.maxWidth, chartData),
-                onTapDown: (details) => _handleTouch(details.localPosition.dx, constraints.maxWidth, chartData),
+          Container(
+            decoration: BoxDecoration(
+              border: Border(
+                left: BorderSide(color: navyDark.withOpacity(0.8), width: 2.5), 
+                bottom: BorderSide(color: navyDark.withOpacity(0.8), width: 2.5), 
+              )
+            ),
+            height: 280, 
+            width: double.infinity,
+            child: SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              physics: const BouncingScrollPhysics(),
+              child: GestureDetector(
+                onPanDown: (details) => _handleTouch(details.localPosition.dx, chartWidth, chartData),
+                onTapDown: (details) => _handleTouch(details.localPosition.dx, chartWidth, chartData),
                 child: Container(
-                  padding: const EdgeInsets.only(left: 10, right: 10, bottom: 5),
-                  decoration: BoxDecoration(
-                    border: Border(
-                      left: BorderSide(color: navyDark.withOpacity(0.5), width: 2.5), 
-                      bottom: BorderSide(color: navyDark.withOpacity(0.5), width: 2.5), 
-                    )
-                  ),
-                  height: 200,
-                  width: double.infinity,
+                  width: chartWidth, 
+                  color: Colors.transparent, 
                   child: CustomPaint(
-                    size: Size.infinite,
+                    size: const Size(chartWidth, 280),
                     painter: DynamicChartPainter(chartData, isBeratBadan, _touchedIndex),
                   ),
                 ),
-              );
-            }
+              ),
+            ),
           ),
           const SizedBox(height: 12),
 
@@ -577,7 +601,7 @@ class _AnakScreenState extends State<AnakScreen> {
             mainAxisAlignment: MainAxisAlignment.end,
             children: [
               Text(
-                "Sumbu X : Waktu (Kiri Lama ➔ Kanan Baru)", 
+                "X : Umur (0 - 60 Bulan)", 
                 style: TextStyle(color: navyDark, fontSize: 12, fontWeight: FontWeight.w700)
               ),
               const SizedBox(width: 6),
@@ -610,7 +634,6 @@ class _AnakScreenState extends State<AnakScreen> {
             child: ElevatedButton.icon(
               onPressed: () {
                 final currentChild = _daftarAnak[selectedIndex]; 
-
                 Navigator.push(
                   context, 
                   MaterialPageRoute(
@@ -642,27 +665,6 @@ class _AnakScreenState extends State<AnakScreen> {
         ],
       ),
     );
-  }
-
-  void _handleTouch(double dx, double maxWidth, List<Map<String, double>> chartData) {
-    if (chartData.isEmpty) return;
-    
-    // Cari index terdekat dengan titik sentuh x
-    double tapAge = (dx / maxWidth) * 60; // 60 adalah maxAge
-    int closestIndex = 0;
-    double minDiff = double.infinity;
-    
-    for (int i = 0; i < chartData.length; i++) {
-      double diff = (chartData[i]['umur']! - tapAge).abs();
-      if (diff < minDiff) {
-        minDiff = diff;
-        closestIndex = i;
-      }
-    }
-    
-    setState(() {
-      _touchedIndex = closestIndex;
-    });
   }
 
   Widget _buildLegendItem(Color color, String label) {
@@ -794,11 +796,11 @@ class DynamicChartPainter extends CustomPainter {
     final double w = size.width;
     final double h = size.height;
 
-    int maxAge = 60; // Max umur 60 Bulan (5 Tahun) untuk standar
+    int maxAge = 60; // Max umur 60 Bulan
     double minValue = isBerat ? 0 : 40; // Batas Bawah Y
     double maxValue = isBerat ? 25 : 125; // Batas Atas Y
     
-    // Fungsi konversi Koordinat (Month -> X, Nilai -> Y)
+    // Koordinat (Month -> X, Nilai -> Y)
     Offset getCoord(double month, double value) {
       double x = (month / maxAge) * w;
       if(value < minValue) value = minValue;
@@ -807,7 +809,31 @@ class DynamicChartPainter extends CustomPainter {
       return Offset(x, y);
     }
 
-    // 1. BUAT GARIS PITA KMS
+    // --- 1. GAMBAR GRID (BACKGROUND BUKU KIA) ---
+    Paint gridPaint = Paint()..color = Colors.grey.withOpacity(0.3)..strokeWidth = 1;
+
+    // Grid Vertikal (Setiap Bulan)
+    for (int i = 0; i <= maxAge; i++) {
+      double x = (i / maxAge) * w;
+      canvas.drawLine(Offset(x, 0), Offset(x, h), gridPaint);
+      
+      // Kasih angka umur setiap kelipatan 6 bulan di paling bawah
+      if (i % 6 == 0) {
+        final textSpan = TextSpan(text: "$i", style: const TextStyle(color: Colors.black54, fontSize: 10));
+        final tp = TextPainter(text: textSpan, textDirection: TextDirection.ltr);
+        tp.layout();
+        tp.paint(canvas, Offset(x - (tp.width / 2), h - 15));
+      }
+    }
+
+    // Grid Horizontal
+    int stepY = isBerat ? 2 : 10;
+    for (double i = minValue; i <= maxValue; i += stepY) {
+      double y = h - (((i - minValue) / (maxValue - minValue)) * h);
+      canvas.drawLine(Offset(0, y), Offset(w, y), gridPaint);
+    }
+
+    // --- 2. BUAT GARIS PITA KMS ---
     List<Offset> linePlus3SD = [], linePlus2SD = [], linePlus1SD = [];
     List<Offset> lineMinus1SD = [], lineMinus2SD = [], lineMinus3SD = [];
 
@@ -829,24 +855,23 @@ class DynamicChartPainter extends CustomPainter {
       lineMinus3SD.add(getCoord(month.toDouble(), baseGrowth - (sdVariance * 3.5)));
     }
 
-    // Fungsi Pembantu untuk Menggambar Area Pita (Zone)
     void drawZone(List<Offset> topList, List<Offset> bottomList, Color color) {
       final path = Path();
       path.moveTo(topList.first.dx, topList.first.dy);
       for (var point in topList) { path.lineTo(point.dx, point.dy); }
       for (var point in bottomList.reversed) { path.lineTo(point.dx, point.dy); }
       path.close();
-      canvas.drawPath(path, Paint()..color = color..style = PaintingStyle.fill);
+      // Gunakan withOpacity supaya Grid-nya kelihatan nembus!
+      canvas.drawPath(path, Paint()..color = color.withOpacity(0.5)..style = PaintingStyle.fill);
     }
 
-    // Gambar Area Pita Berdasarkan Warna Panduan
-    drawZone(linePlus3SD, linePlus2SD, const Color(0xFFF7C300));    // Kuning Atas
-    drawZone(linePlus2SD, linePlus1SD, const Color(0xFF81C784));    // Hijau Muda Atas
-    drawZone(linePlus1SD, lineMinus1SD, const Color(0xFF4CAF50));   // Hijau Normal
-    drawZone(lineMinus1SD, lineMinus2SD, const Color(0xFF81C784));  // Hijau Muda Bawah
-    drawZone(lineMinus2SD, lineMinus3SD, const Color(0xFFF7C300));  // Kuning Bawah
+    drawZone(linePlus3SD, linePlus2SD, const Color(0xFFF7C300)); 
+    drawZone(linePlus2SD, linePlus1SD, const Color(0xFF81C784)); 
+    drawZone(linePlus1SD, lineMinus1SD, const Color(0xFF4CAF50));
+    drawZone(lineMinus1SD, lineMinus2SD, const Color(0xFF81C784)); 
+    drawZone(lineMinus2SD, lineMinus3SD, const Color(0xFFF7C300));
 
-    // 2. PLOT TITIK & GARIS DATA ANAK
+    // --- 3. PLOT TITIK & GARIS DATA ANAK ---
     if (dataPoints.isNotEmpty) {
       final path = Path();
       List<Offset> pointOffsets = [];
@@ -859,63 +884,68 @@ class DynamicChartPainter extends CustomPainter {
         Offset pt = getCoord(monthAge, val);
         pointOffsets.add(pt);
 
-        if (i == 0) {
-          path.moveTo(pt.dx, pt.dy);
-        } else {
-          path.lineTo(pt.dx, pt.dy);
-        }
+        if (i == 0) path.moveTo(pt.dx, pt.dy);
+        else path.lineTo(pt.dx, pt.dy);
       }
 
-      // Gambar Garis Sambungan
+      // Bikin Outline putih dulu biar garis hitamnya stand out dan nggak nyaru dengan background hijau
       canvas.drawPath(path, Paint()
-        ..color = Colors.black87 
+        ..color = Colors.white 
+        ..strokeWidth = 6.0 
+        ..strokeJoin = StrokeJoin.round
+        ..style = PaintingStyle.stroke);
+
+      // Gambar Garis Sambungan Asli
+      canvas.drawPath(path, Paint()
+        ..color = const Color(0xFF102C57) 
         ..strokeWidth = 3.0 
         ..strokeJoin = StrokeJoin.round
         ..style = PaintingStyle.stroke);
 
-      // Gambar Lingkaran Titik & Tooltip Interaktif
+      // Gambar Lingkaran Titik
       for (int i = 0; i < pointOffsets.length; i++) {
         var pt = pointOffsets[i];
         
-        // Titik
-        canvas.drawCircle(pt, 5.0, Paint()..color = Colors.white..style = PaintingStyle.fill); 
-        canvas.drawCircle(pt, 3.5, Paint()..color = Colors.black87..style = PaintingStyle.fill);
+        // Outline putih luar (Lebih besar)
+        canvas.drawCircle(pt, 7.0, Paint()..color = Colors.white..style = PaintingStyle.fill); 
+        // Titik Dalam
+        canvas.drawCircle(pt, 4.5, Paint()..color = const Color(0xFF102C57)..style = PaintingStyle.fill);
 
-        // Render Tooltip jika titik disentuh
+        // Render Tooltip 
         if (touchedIndex == i) {
+          // Efek bulatan besar saat disentuh
+          canvas.drawCircle(pt, 12.0, Paint()..color = Colors.blueAccent.withOpacity(0.3)..style = PaintingStyle.fill);
+
           final val = dataPoints[i]['nilai'];
+          final umurBulan = dataPoints[i]['umur'];
           final textSpan = TextSpan(
-            text: "$val ${isBerat ? 'kg' : 'cm'}",
-            style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold),
+            text: "$val ${isBerat ? 'kg' : 'cm'}\n(Bulan ke-${umurBulan?.toInt()})",
+            style: const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.bold),
           );
           
-          final textPainter = TextPainter(text: textSpan, textDirection: TextDirection.ltr);
+          final textPainter = TextPainter(text: textSpan, textDirection: TextDirection.ltr, textAlign: TextAlign.center);
           textPainter.layout();
           
           final rectWidth = textPainter.width + 16;
           final rectHeight = textPainter.height + 10;
           double rectX = pt.dx - (rectWidth / 2);
           
-          // Agar tooltip tidak keluar layar
           if (rectX < 0) rectX = 0;
           if (rectX + rectWidth > size.width) rectX = size.width - rectWidth;
           
-          final rect = Rect.fromLTWH(rectX, pt.dy - rectHeight - 12, rectWidth, rectHeight);
+          final rect = Rect.fromLTWH(rectX, pt.dy - rectHeight - 16, rectWidth, rectHeight);
           
-          // Shadow Tooltip
           canvas.drawRRect(
-            RRect.fromRectAndRadius(rect, const Radius.circular(6)),
-            Paint()..color = Colors.black87..maskFilter = const MaskFilter.blur(BlurStyle.normal, 2),
+            RRect.fromRectAndRadius(rect, const Radius.circular(8)),
+            Paint()..color = const Color(0xFF102C57)..maskFilter = const MaskFilter.blur(BlurStyle.normal, 2),
           );
           
-          // Box Tooltip
           canvas.drawRRect(
-            RRect.fromRectAndRadius(rect, const Radius.circular(6)),
-            Paint()..color = Colors.black87,
+            RRect.fromRectAndRadius(rect, const Radius.circular(8)),
+            Paint()..color = const Color(0xFF102C57),
           );
           
-          // Text Tooltip
-          textPainter.paint(canvas, Offset(rectX + 8, pt.dy - rectHeight - 7));
+          textPainter.paint(canvas, Offset(rectX + 8, pt.dy - rectHeight - 11));
         }
       }
     }
