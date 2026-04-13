@@ -213,6 +213,38 @@ class _AnakScreenState extends State<AnakScreen> {
     });
   }
 
+  // --- HELPER UNTUK LOGIKA WARNA STATUS GIZI ---
+  Color _getStatusColor(String rawStatus) {
+    if (rawStatus.isEmpty || rawStatus == "Menunggu Data") return navyDark;
+    
+    String statusLower = rawStatus.toLowerCase();
+    
+    if (statusLower.contains("normal") || statusLower.contains("baik")) {
+      return successGreen; // Hijau
+    } else if (statusLower.contains("risiko") || statusLower.contains("lebih") || statusLower.contains("tinggi")) {
+      return Colors.orangeAccent.shade700; // Kuning (Oranye gelap agar teks putih tetap terbaca)
+    } else if (statusLower.contains("kurang") || statusLower.contains("buruk") || statusLower.contains("pendek")) {
+      return Colors.redAccent; // Merah
+    }
+    return navyDark; // Default
+  }
+
+  // --- HELPER UNTUK LOGIKA TEKS STATUS GIZI ---
+  String _getStatusMessage(String rawStatus) {
+    if (rawStatus.isEmpty || rawStatus == "Menunggu Data") return "Menunggu Data";
+    
+    String statusLower = rawStatus.toLowerCase();
+    
+    if (statusLower.contains("normal") || statusLower.contains("baik")) {
+      return rawStatus; // Teks biasa
+    } else if (statusLower.contains("risiko") || statusLower.contains("lebih") || statusLower.contains("tinggi")) {
+      return "Beresiko: $rawStatus"; // Tambah Beresiko
+    } else if (statusLower.contains("kurang") || statusLower.contains("buruk") || statusLower.contains("pendek")) {
+      return "Beresiko: $rawStatus"; // Tambah Sangat Beresiko
+    }
+    return rawStatus;
+  }
+
   @override
   Widget build(BuildContext context) {
     if (_isLoading) {
@@ -277,7 +309,9 @@ class _AnakScreenState extends State<AnakScreen> {
       boxColor = Colors.orangeAccent.withOpacity(0.3);
     } else {
       String statusLower = rawStatus.toLowerCase();
-      pesan = "Berdasarkan tren grafik $name, Prediksi status gizinya bulan depan berpotensi mengarah ke: *$rawStatus*.\n\n";
+      // Menggunakan helper message agar di teks deskripsi juga muncul kata "Beresiko"
+      String formattedStatus = _getStatusMessage(rawStatus);
+      pesan = "Berdasarkan tren grafik $name, Prediksi status gizinya bulan depan berpotensi mengarah ke: *$formattedStatus*.\n\n";
 
       if (statusLower.contains("normal") || statusLower.contains("baik")) {
         boxColor = successGreen.withOpacity(0.6);
@@ -318,7 +352,12 @@ class _AnakScreenState extends State<AnakScreen> {
   }
 
   Widget _buildPrediksiGizi() {
-    String status = _prediksiTerbaru?['status_gizi'] ?? "Menunggu Data";
+    String rawStatus = _prediksiTerbaru?['status_gizi'] ?? "Menunggu Data";
+    
+    // Ambil Warna dan Teks yang sudah diformat dari Helper
+    Color badgeColor = _getStatusColor(rawStatus);
+    String displayStatus = _getStatusMessage(rawStatus);
+
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(color: fieldPink, borderRadius: BorderRadius.circular(20)),
@@ -352,11 +391,12 @@ class _AnakScreenState extends State<AnakScreen> {
                 Flexible(
                   child: Container(
                     padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                    decoration: BoxDecoration(color: navyDark, borderRadius: BorderRadius.circular(10)),
+                    // Warna box mengambil dari fungsi helper
+                    decoration: BoxDecoration(color: badgeColor, borderRadius: BorderRadius.circular(10)),
                     child: Text(
-                      status.toUpperCase(), 
+                      displayStatus.toUpperCase(), 
                       textAlign: TextAlign.center,
-                      style: TextStyle(color: softPink, fontSize: 10, fontWeight: FontWeight.bold),
+                      style: const TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold),
                     ),
                   ),
                 )

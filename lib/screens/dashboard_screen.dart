@@ -436,7 +436,12 @@ class _DashboardScreenState extends State<DashboardScreen> {
           }
           final anakAktif = _daftarAnak[_selectedAnakIndex];
           Navigator.push(context, MaterialPageRoute(
-            builder: (context) => StatistikPertumbuhanScreen(anakId: anakAktif['id'].toString(), namaAnak: anakAktif['nama'] ?? 'Si Kecil')
+            builder: (context) => StatistikPertumbuhanScreen(
+              anakId: anakAktif['id'].toString(), 
+              namaAnak: anakAktif['nama'] ?? 'Si Kecil',
+              jenisKelamin: anakAktif['jenis_kelamin'] ?? 'L',
+              statusGizi: anakAktif['status_gizi'] ?? 'Normal', // ✅ DITAMBAHKAN DI SINI YA BUNDA
+            )
           )).then((_) {
             _cekJadwalBesok(anakAktif['id'].toString());
           });

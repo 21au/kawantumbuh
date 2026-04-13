@@ -103,7 +103,7 @@ class _GrafikLengkapScreenState extends State<GrafikLengkapScreen> {
                     maxScale: 4.0,
                     child: Container(
                       color: Colors.white,
-                      padding: const EdgeInsets.only(top: 20, right: 40, bottom: 80, left: 100), 
+                      padding: const EdgeInsets.only(top: 30, right: 40, bottom: 80, left: 100), 
                       width: canvasWidth,
                       height: canvasHeight,
                       child: CustomPaint(
@@ -301,35 +301,32 @@ class BukuKmsPainter extends CustomPainter {
       {'start': 36, 'end': 60, 'desc': 'Bermain aktif\nMandiri', 'icon': '🤸'},
     ];
 
-    _drawText(canvas, "PANDUAN PERTUMBUHAN & PERKEMBANGAN ANAK", const Offset(0, -15), const TextStyle(fontWeight: FontWeight.bold, fontSize: 12, color: Colors.red));
+    final titlePainter = TextPainter(
+      text: const TextSpan(
+        text: "PANDUAN PERTUMBUHAN & PERKEMBANGAN ANAK", 
+        style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12, color: Colors.red)
+      ),
+      textDirection: TextDirection.ltr
+    )..layout();
+    
+    double titleX = (w / 2) - (titlePainter.width / 2);
+    titlePainter.paint(canvas, Offset(titleX, -25));
 
     for (var m in milestones) {
       double startX = ((m['start'] as int) / maxAge) * w;
       double endX = ((m['end'] as int) / maxAge) * w;
       double centerX = startX + ((endX - startX) / 2);
-      
-      double colWidth = endX - startX; 
 
       if (m['start'] != 0) {
         canvas.drawLine(Offset(startX, 10), Offset(startX, headerHeight), linePaint);
       }
 
-      double currentFontSize = 9.0;
-      TextPainter tpDesc;
-      
-      while (true) {
-        tpDesc = TextPainter(
-          text: TextSpan(text: m['desc'] as String, style: TextStyle(fontSize: currentFontSize, color: Colors.black87)),
-          textAlign: TextAlign.center,
-          textDirection: TextDirection.ltr,
-        )..layout();
-
-        if (tpDesc.width > colWidth - 6 && currentFontSize > 5.0) {
-          currentFontSize -= 0.5;
-        } else {
-          break; 
-        }
-      }
+      double fixedFontSize = 7.0;
+      final tpDesc = TextPainter(
+        text: TextSpan(text: m['desc'] as String, style: TextStyle(fontSize: fixedFontSize, color: Colors.black87)),
+        textAlign: TextAlign.center,
+        textDirection: TextDirection.ltr,
+      )..layout();
       
       tpDesc.paint(canvas, Offset(centerX - (tpDesc.width / 2), 15));
 
@@ -379,61 +376,64 @@ class BukuKmsPainter extends CustomPainter {
     _drawText(canvas, "Umur (Bulan)", Offset(-90, startYBoxes + 6), boldTextStyle);
     if (isBerat) _drawText(canvas, "Keterangan", Offset(-90, startYBoxes + boxHeight + 6), boldTextStyle);
 
+    final rectUmurFull = Rect.fromLTWH(0, startYBoxes, w, boxHeight);
+    canvas.drawRect(rectUmurFull, Paint()..color = Colors.white..style = PaintingStyle.fill);
+    canvas.drawRect(rectUmurFull, Paint()..color = Colors.black54..style = PaintingStyle.stroke..strokeWidth = 1);
+
     for (int i = 0; i <= maxAge; i++) {
       double x = (i / maxAge) * w;
-      double colWidth = w / maxAge;
 
       bool isYearLine = i % 12 == 0; 
       canvas.drawLine(Offset(x, headerHeight), Offset(x, h), isYearLine ? heavyGridPaint : gridPaint);
 
-      if (i < maxAge) {
-        final rectBulan = Rect.fromLTWH(x, startYBoxes, colWidth, boxHeight);
-        canvas.drawRect(rectBulan, Paint()..color = Colors.white..style = PaintingStyle.fill);
-        canvas.drawRect(rectBulan, Paint()..color = Colors.black54..style = PaintingStyle.stroke..strokeWidth = 1);
-        final tpBulan = TextPainter(text: TextSpan(text: "$i", style: boldTextStyle), textDirection: TextDirection.ltr)..layout();
-        tpBulan.paint(canvas, Offset(x + (colWidth / 2) - (tpBulan.width / 2), startYBoxes + 6));
-
-        if (isBerat) {
-          final rectKeterangan = Rect.fromLTWH(x, startYBoxes + boxHeight, colWidth, boxHeight);
-          Color boxColor = Colors.white; 
-          
-          if (i < 6) {
-             boxColor = const Color(0xFFF48FB1); 
-          } else if (i < 24) {
-             double fadeOpacity = 1.0 - ((i - 6) / (24 - 6)) * 0.85; 
-             boxColor = const Color(0xFFF48FB1).withOpacity(fadeOpacity.clamp(0.15, 1.0)); 
-          }
-
-          canvas.drawRect(rectKeterangan, Paint()..color = boxColor..style = PaintingStyle.fill);
-          canvas.drawRect(rectKeterangan, Paint()..color = Colors.black54..style = PaintingStyle.stroke..strokeWidth = 1);
-        }
+      // Tick mark: Hanya digambar di dalam rentang agar tidak menabrak bingkai ujung 0 dan 60
+      if (i > 0 && i < maxAge) {
+        canvas.drawLine(Offset(x, startYBoxes), Offset(x, startYBoxes + 4), Paint()..color = Colors.black54..strokeWidth = 1);
       }
+
+      final tpBulan = TextPainter(text: TextSpan(text: "$i", style: boldTextStyle), textDirection: TextDirection.ltr)..layout();
+      
+      // REVISI: Perbaikan Posisi Angka agar masuk sepenuhnya ke dalam kotak
+      double textX;
+      if (i == 0) {
+        textX = x + 4; // Ujung kiri: didorong 4px ke kanan agar masuk bingkai
+      } else if (i == maxAge) {
+        textX = x - tpBulan.width - 4; // Ujung kanan: didorong 4px ke kiri agar masuk bingkai
+      } else {
+        textX = x - (tpBulan.width / 2); // Selain itu: presisi di tengah garis
+      }
+
+      tpBulan.paint(canvas, Offset(textX, startYBoxes + 6));
     }
 
     if (isBerat) {
-      double asiWidth = (24 / maxAge) * w; 
-      String textMotivasi = "ASI EKSKLUSIF (0-6 BLN) & LANJUT MENYUSUI HINGGA 2 TAHUN. AYO IBU SEMANGAT BERIKAN HAK TERBAIK ANAK!";
+      double startYKeterangan = startYBoxes + boxHeight;
+      final rectKeteranganFull = Rect.fromLTWH(0, startYKeterangan, w, boxHeight);
       
-      double currentFontSize = 10.0;
-      TextPainter tpAsi;
-      
-      while (true) {
-        tpAsi = TextPainter(
-          text: TextSpan(
-            text: textMotivasi, 
-            style: TextStyle(fontWeight: FontWeight.bold, fontSize: currentFontSize, color: Colors.pink.shade900)
-          ), 
-          textDirection: TextDirection.ltr
-        )..layout();
+      final gradientPaint = Paint()
+        ..shader = LinearGradient(
+          colors: [
+            const Color(0xFFE91E63), 
+            const Color(0xFFF8BBD0).withOpacity(0.1), 
+          ],
+          begin: Alignment.centerLeft,
+          end: Alignment.centerRight,
+        ).createShader(rectKeteranganFull)
+        ..style = PaintingStyle.fill;
 
-        if (tpAsi.width > asiWidth - 10 && currentFontSize > 5.0) {
-          currentFontSize -= 0.5;
-        } else {
-          break; 
-        }
-      }
+      canvas.drawRect(rectKeteranganFull, gradientPaint);
+      canvas.drawRect(rectKeteranganFull, Paint()..color = Colors.black54..style = PaintingStyle.stroke..strokeWidth = 1);
 
-      tpAsi.paint(canvas, Offset((asiWidth / 2) - (tpAsi.width / 2), startYBoxes + boxHeight + ((boxHeight - tpAsi.height) / 2)));
+      String textMotivasi = "ASI EKSKLUSIF (0-6 BLN) & LANJUT MENYUSUI HINGGA 2 TAHUN (24 BLN) - PANTAU GIZI HINGGA 60 BLN";
+      final tpAsi = TextPainter(
+        text: TextSpan(
+          text: textMotivasi, 
+          style: TextStyle(fontWeight: FontWeight.bold, fontSize: 10.0, color: Colors.pink.shade900)
+        ), 
+        textDirection: TextDirection.ltr
+      )..layout();
+
+      tpAsi.paint(canvas, Offset((w / 2) - (tpAsi.width / 2), startYKeterangan + ((boxHeight - tpAsi.height) / 2)));
     }
   }
 
@@ -451,27 +451,23 @@ class BukuKmsPainter extends CustomPainter {
       return Offset(x, y);
     }
 
-    // 6 Garis batas untuk membuat 5 Pita Area yang TEBAL
     List<Offset> linePlus3SD = [], linePlus2SD = [], linePlus1SD = [];
     List<Offset> lineMinus1SD = [], lineMinus2SD = [], lineMinus3SD = [];
 
     for (int month = 0; month <= maxAge; month++) {
-      // Base growth direvisi sedikit agar pas di tengah-tengah rentang standar KIA
       double baseGrowth = isBerat 
           ? 3.3 + (1.8 * sqrt(month)) + (0.015 * month)  
           : 50.0 + (7.0 * sqrt(month)) + (0.08 * month); 
       
-      // Variansi dilebarkan drastis menggunakan fungsi sqrt agar pita sangat tebal memenuhi grid
       double sdVariance = isBerat 
           ? 0.6 + (0.25 * sqrt(month)) 
           : 2.0 + (0.5 * sqrt(month));
 
-      // Multiplier ditarik lebar ke atas dan ke bawah
       linePlus3SD.add(getCoord(month.toDouble(), baseGrowth + (sdVariance * 3.5)));
       linePlus2SD.add(getCoord(month.toDouble(), baseGrowth + (sdVariance * 2.0)));
-      linePlus1SD.add(getCoord(month.toDouble(), baseGrowth + (sdVariance * 0.6))); // Batas atas Hijau Tua
+      linePlus1SD.add(getCoord(month.toDouble(), baseGrowth + (sdVariance * 0.6))); 
       
-      lineMinus1SD.add(getCoord(month.toDouble(), baseGrowth - (sdVariance * 0.6))); // Batas bawah Hijau Tua
+      lineMinus1SD.add(getCoord(month.toDouble(), baseGrowth - (sdVariance * 0.6))); 
       lineMinus2SD.add(getCoord(month.toDouble(), baseGrowth - (sdVariance * 2.0)));
       lineMinus3SD.add(getCoord(month.toDouble(), baseGrowth - (sdVariance * 3.5)));
     }
@@ -485,14 +481,12 @@ class BukuKmsPainter extends CustomPainter {
       canvas.drawPath(path, Paint()..color = color..style = PaintingStyle.fill);
     }
 
-    // 5 Lapis Pita Lebar persis seperti Buku KMS
-    drawZone(linePlus3SD, linePlus2SD, const Color(0xFFF7C300));   // Pita Kuning Atas
-    drawZone(linePlus2SD, linePlus1SD, const Color(0xFF81C784));   // Pita Hijau Muda Atas
-    drawZone(linePlus1SD, lineMinus1SD, const Color(0xFF4CAF50));  // Pita Hijau Tua (Tengah)
-    drawZone(lineMinus1SD, lineMinus2SD, const Color(0xFF81C784)); // Pita Hijau Muda Bawah
-    drawZone(lineMinus2SD, lineMinus3SD, const Color(0xFFF7C300)); // Pita Kuning Bawah
+    drawZone(linePlus3SD, linePlus2SD, const Color(0xFFF7C300));   
+    drawZone(linePlus2SD, linePlus1SD, const Color(0xFF81C784));   
+    drawZone(linePlus1SD, lineMinus1SD, const Color(0xFF4CAF50));  
+    drawZone(lineMinus1SD, lineMinus2SD, const Color(0xFF81C784)); 
+    drawZone(lineMinus2SD, lineMinus3SD, const Color(0xFFF7C300)); 
 
-    // Garis Merah BGM di bagian paling bawah
     final redPath = Path();
     redPath.moveTo(lineMinus3SD.first.dx, lineMinus3SD.first.dy);
     for (var point in lineMinus3SD) { redPath.lineTo(point.dx, point.dy); }
@@ -520,13 +514,11 @@ class BukuKmsPainter extends CustomPainter {
     if (dataPoints.isEmpty) return;
     double graphAreaHeight = h - headerHeight;
 
-    // Garis data anak tetap TEBAL dan HITAM
     final linePaint = Paint()
       ..color = Colors.black 
-      ..strokeWidth = 5 
+      ..strokeWidth = 2.0 
       ..style = PaintingStyle.stroke;
     
-    // Titik ditambahkan outline putih tipis agar kontras menyala (seperti screenshot Anda)
     final dotOutlinePaint = Paint()..color = Colors.white..style = PaintingStyle.fill;
     final dotPaint = Paint()..color = Colors.black..style = PaintingStyle.fill; 
 
@@ -540,8 +532,8 @@ class BukuKmsPainter extends CustomPainter {
       if (i == 0) path.moveTo(x, y);
       else path.lineTo(x, y);
 
-      canvas.drawCircle(Offset(x, y), 6.5, dotOutlinePaint); // Border putih
-      canvas.drawCircle(Offset(x, y), 4.5, dotPaint);        // Titik hitam pekat
+      canvas.drawCircle(Offset(x, y), 6.5, dotOutlinePaint); 
+      canvas.drawCircle(Offset(x, y), 4.5, dotPaint);        
     }
     canvas.drawPath(path, linePaint);
   }
