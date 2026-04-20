@@ -249,7 +249,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
           // KATEGORI 1: AKUN
           Text("Akun Bunda", style: TextStyle(color: navyDark, fontWeight: FontWeight.bold, fontSize: 16)),
           const SizedBox(height: 10),
-          _buildMenuItem(Icons.edit_note_rounded, "Ubah Data Profil", () async {
+          _buildMenuItem(Icons.edit_note_rounded, "Data Profil", () async {
             await Navigator.push(context, MaterialPageRoute(builder: (context) => const EditProfileScreen()));
             _loadUserData(); 
           }),

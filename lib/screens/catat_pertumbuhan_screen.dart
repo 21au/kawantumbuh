@@ -1,5 +1,7 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:http/http.dart' as http;
 
 class CatatPertumbuhanScreen extends StatefulWidget {
   final String anakId;
@@ -11,16 +13,16 @@ class CatatPertumbuhanScreen extends StatefulWidget {
 }
 
 class _CatatPertumbuhanScreenState extends State<CatatPertumbuhanScreen> {
-  // --- WARNA DIAMBIL PERSIS DARI GAMBAR DESAIN ---
+  // --- WARNA TEMA POSYANDU ---
   final Color navyDark = const Color(0xFF102C57);
-  final Color backgroundPink = const Color(0xFFFAEEEE); // Background utama blush pink
-  final Color cardBackground = const Color(0xFFFFF3F3); // Background card (putih pinkish)
-  final Color cardBorder = const Color(0xFFF2D6D6); // Garis pinggir card
-  final Color minusBtnColor = const Color(0xFFE5A4A4); // Merah muda pastel/salmon
-  final Color plusBtnColor = const Color(0xFF1E7FB8); // Biru ocean
-  final Color saveBtnColor = const Color(0xFFA6E5A3); // Hijau pastel
-  final Color dateIconPink = const Color(0xFFEA9494); // Pink untuk icon kalender
-  final Color arrowBlue = const Color(0xFF4CA0D9); // Biru untuk icon panah bawah
+  final Color backgroundPink = const Color(0xFFFAEEEE); 
+  final Color cardBackground = const Color(0xFFFFF3F3); 
+  final Color cardBorder = const Color(0xFFF2D6D6); 
+  final Color minusBtnColor = const Color(0xFFE5A4A4); 
+  final Color plusBtnColor = const Color(0xFF1E7FB8); 
+  final Color saveBtnColor = const Color(0xFFA6E5A3); 
+  final Color dateIconPink = const Color(0xFFEA9494); 
+  final Color arrowBlue = const Color(0xFF4CA0D9); 
 
   late TextEditingController _beratController;
   late TextEditingController _tinggiController;
@@ -28,12 +30,15 @@ class _CatatPertumbuhanScreenState extends State<CatatPertumbuhanScreen> {
   DateTime _selectedDate = DateTime.now();
   bool _isLoading = false;
 
+  // Pastikan URL ini sesuai dengan yang ada di Hugging Face kamu
+  final String hfApiUrl = "https://audreyrey-api-prediksi-kawan.hf.space/trigger-prediksi";
+
   @override
   void initState() {
     super.initState();
-    _beratController = TextEditingController(text: "40.0");
-    _tinggiController = TextEditingController(text: "60.0");
-    _lingkarController = TextEditingController(text: "45.0");
+    _beratController = TextEditingController(text: "0.0");
+    _tinggiController = TextEditingController(text: "0.0");
+    _lingkarController = TextEditingController(text: "0.0");
   }
 
   @override
@@ -44,12 +49,14 @@ class _CatatPertumbuhanScreenState extends State<CatatPertumbuhanScreen> {
     super.dispose();
   }
 
+  // --- FUNGSI PENDUKUNG ---
+
   Future<void> _pilihTanggal(BuildContext context) async {
     final DateTime? picked = await showDatePicker(
       context: context,
       initialDate: _selectedDate,
       firstDate: DateTime(2020), 
-      lastDate: DateTime(2030), 
+      lastDate: DateTime.now(), // Tidak boleh masa depan
       builder: (context, child) {
         return Theme(
           data: Theme.of(context).copyWith(
@@ -58,13 +65,11 @@ class _CatatPertumbuhanScreenState extends State<CatatPertumbuhanScreen> {
               onPrimary: Colors.white, 
               onSurface: navyDark, 
             ),
-            dialogBackgroundColor: backgroundPink,
           ),
           child: child!,
         );
       },
     );
-
     if (picked != null && picked != _selectedDate) {
       setState(() => _selectedDate = picked);
     }
@@ -88,33 +93,75 @@ class _CatatPertumbuhanScreenState extends State<CatatPertumbuhanScreen> {
     });
   }
 
+  // --- FUNGSI API & DATABASE ---
+
+  Future<bool> _triggerPrediksiHuggingFace() async {
+    try {
+      // Menggunakan GET agar sinkron dengan setelan server Python (app.py)
+      final response = await http.get(
+        Uri.parse(hfApiUrl),
+      );
+
+      if (response.statusCode == 200) {
+        debugPrint("✅ Berhasil trigger AI: ${response.body}");
+        return true; 
+      } else {
+        debugPrint("❌ Error Hugging Face: ${response.statusCode}");
+        return false;
+      }
+    } catch (e) {
+      debugPrint("⚠️ Exception API: $e");
+      return false;
+    }
+  }
+
   Future<void> _simpanData() async {
     setState(() => _isLoading = true);
     try {
+      final double berat = double.tryParse(_beratController.text.replaceAll(',', '.')) ?? 0;
+      final double tinggi = double.tryParse(_tinggiController.text.replaceAll(',', '.')) ?? 0;
+      final double lingkar = double.tryParse(_lingkarController.text.replaceAll(',', '.')) ?? 0;
+
+      // Validasi Input
+      if (berat <= 0 || tinggi <= 0) {
+        throw "Wah, Berat dan Tinggi badannya masih 0 nih Bun. Yuk, diisi dulu yang benar! ✨";
+      }
+
+      // 1. Simpan Data ke Supabase
       await Supabase.instance.client.from('pertumbuhan').insert({
         'anak_id': widget.anakId,
         'tanggal_pengukuran': _selectedDate.toIso8601String(),
-        'berat_badan': double.tryParse(_beratController.text.replaceAll(',', '.')) ?? 0,
-        'tinggi_badan': double.tryParse(_tinggiController.text.replaceAll(',', '.')) ?? 0,
-        'lingkar_kepala': double.tryParse(_lingkarController.text.replaceAll(',', '.')) ?? 0,
+        'berat_badan': berat,
+        'tinggi_badan': tinggi,
+        'lingkar_kepala': lingkar,
       });
+
+      // 2. Langsung pancing AI agar hasil prediksi terupdate
+      bool suksesAI = await _triggerPrediksiHuggingFace();
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Data berhasil disimpan!'), backgroundColor: Colors.green),
+          SnackBar(
+            content: Text(suksesAI 
+              ? 'Yey! Data & Prediksi berhasil disimpan, Bun! 🎉' 
+              : 'Data tersimpan! Menunggu AI memperbarui prediksi... 😊'), 
+            backgroundColor: suksesAI ? Colors.green : Colors.orange
+          ),
         );
         Navigator.pop(context, true); 
       }
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Gagal menyimpan: $e'), backgroundColor: Colors.red),
+          SnackBar(content: Text(e.toString()), backgroundColor: minusBtnColor),
         );
       }
     } finally {
       if (mounted) setState(() => _isLoading = false);
     }
   }
+
+  // --- UI LAYOUT ---
 
   @override
   Widget build(BuildContext context) {
@@ -145,7 +192,7 @@ class _CatatPertumbuhanScreenState extends State<CatatPertumbuhanScreen> {
                     children: [
                       Icon(Icons.arrow_back, color: Colors.white, size: 20),
                       SizedBox(width: 8),
-                      Text("Kembali", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 14)),
+                      Text("Kembali", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
                     ],
                   ),
                 ),
@@ -162,7 +209,7 @@ class _CatatPertumbuhanScreenState extends State<CatatPertumbuhanScreen> {
               padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 25),
               child: Column(
                 children: [
-                  // --- TANGGAL TANPA KOTAK (PERSIS DESAIN) ---
+                  // --- TANGGAL ---
                   GestureDetector(
                     onTap: () => _pilihTanggal(context), 
                     child: Row(
@@ -174,7 +221,6 @@ class _CatatPertumbuhanScreenState extends State<CatatPertumbuhanScreen> {
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Text("Tanggal Pengukuran", style: TextStyle(color: navyDark.withOpacity(0.7), fontSize: 11, fontWeight: FontWeight.w600)),
-                            const SizedBox(height: 2),
                             Text(_formatTanggal(_selectedDate), style: TextStyle(color: navyDark, fontWeight: FontWeight.bold, fontSize: 13)),
                           ],
                         ),
@@ -206,24 +252,21 @@ class _CatatPertumbuhanScreenState extends State<CatatPertumbuhanScreen> {
                   
                   const SizedBox(height: 35),
                   
-                  // --- TOMBOL SIMPAN DATA (HIJAU PASTEL) ---
+                  // --- TOMBOL SIMPAN ---
                   SizedBox(
                     width: 220, 
                     height: 55,
                     child: ElevatedButton(
                       style: ElevatedButton.styleFrom(
                         backgroundColor: saveBtnColor,
-                        elevation: 3,
-                        shadowColor: Colors.black.withOpacity(0.2),
                         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
                       ),
                       onPressed: _isLoading ? null : _simpanData,
                       child: _isLoading 
-                        ? const SizedBox(width: 24, height: 24, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
+                        ? const CircularProgressIndicator(color: Colors.white)
                         : Text("Simpan Data", style: TextStyle(color: navyDark, fontSize: 16, fontWeight: FontWeight.bold)),
                     ),
                   ),
-                  const SizedBox(height: 20),
                 ],
               ),
             ),
@@ -238,24 +281,19 @@ class _CatatPertumbuhanScreenState extends State<CatatPertumbuhanScreen> {
     required String unit, required VoidCallback onMinus, required VoidCallback onPlus,
   }) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 20),
+      padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
         color: cardBackground, 
         borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: cardBorder, width: 1.2), // Garis pinggir tipis persis desain
+        border: Border.all(color: cardBorder, width: 1.2), 
       ),
       child: Column(
         children: [
           Row(
             children: [
-              // Icon Circle Background Putih
               Container(
                 padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: Colors.white, 
-                  shape: BoxShape.circle,
-                  boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 6, offset: const Offset(0, 3))]
-                ),
+                decoration: const BoxDecoration(color: Colors.white, shape: BoxShape.circle),
                 child: Icon(icon, color: dateIconPink, size: 26),
               ),
               const SizedBox(width: 15),
@@ -263,7 +301,6 @@ class _CatatPertumbuhanScreenState extends State<CatatPertumbuhanScreen> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(title, style: TextStyle(color: navyDark, fontSize: 15, fontWeight: FontWeight.bold)),
-                  const SizedBox(height: 2),
                   Text(subtitle, style: TextStyle(color: navyDark.withOpacity(0.6), fontSize: 11)),
                 ],
               ),
@@ -273,23 +310,8 @@ class _CatatPertumbuhanScreenState extends State<CatatPertumbuhanScreen> {
           Row(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              // Tombol Minus (Salmon Pink) - SEKARANG BULAT
-              InkWell(
-                onTap: onMinus, 
-                customBorder: const CircleBorder(), // Efek klik ikut bulat
-                child: Container(
-                  width: 55, height: 55,
-                  decoration: BoxDecoration(
-                    color: minusBtnColor, 
-                    shape: BoxShape.circle, // Membuat bentuknya bulat sempurna
-                  ),
-                  child: const Icon(Icons.remove, color: Colors.white, size: 32),
-                ),
-              ),
-              
+              IconButton(onPressed: onMinus, icon: const Icon(Icons.remove_circle), color: minusBtnColor, iconSize: 45),
               const Spacer(),
-              
-              // Angka dan Satuan ditumpuk
               Column(
                 children: [
                   SizedBox(
@@ -298,29 +320,18 @@ class _CatatPertumbuhanScreenState extends State<CatatPertumbuhanScreen> {
                       controller: controller,
                       keyboardType: const TextInputType.numberWithOptions(decimal: true),
                       textAlign: TextAlign.center,
-                      style: TextStyle(color: navyDark, fontSize: 36, fontWeight: FontWeight.w900), // Angka dibuat tebal dan besar
-                      decoration: const InputDecoration(border: InputBorder.none, isDense: true, contentPadding: EdgeInsets.zero),
+                      style: TextStyle(color: navyDark, fontSize: 36, fontWeight: FontWeight.w900), 
+                      decoration: const InputDecoration(border: InputBorder.none),
+                      onTap: () {
+                        if (controller.text == "0.0") controller.clear();
+                      },
                     ),
                   ),
-                  Text(unit, style: TextStyle(color: navyDark, fontSize: 16, fontWeight: FontWeight.bold)),
+                  Text(unit, style: TextStyle(color: navyDark, fontWeight: FontWeight.bold)),
                 ],
               ),
-              
               const Spacer(),
-              
-              // Tombol Plus (Biru Ocean) - SEKARANG BULAT
-              InkWell(
-                onTap: onPlus, 
-                customBorder: const CircleBorder(), // Efek klik ikut bulat
-                child: Container(
-                  width: 55, height: 55,
-                  decoration: BoxDecoration(
-                    color: plusBtnColor, 
-                    shape: BoxShape.circle, // Membuat bentuknya bulat sempurna
-                  ),
-                  child: const Icon(Icons.add, color: Colors.white, size: 32),
-                ),
-              ),
+              IconButton(onPressed: onPlus, icon: const Icon(Icons.add_circle), color: plusBtnColor, iconSize: 45),
             ],
           ),
         ],

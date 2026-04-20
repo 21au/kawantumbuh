@@ -41,7 +41,10 @@ class _StatistikPertumbuhanScreenState extends State<StatistikPertumbuhanScreen>
   bool _butuhKonsultasi = false; 
   String _statusGiziAktual = ""; 
 
-  // [DIPERBAIKI] Default nampilin 1 bulan sesuai standar medis
+  // [DITAMBAHKAN] Variabel untuk menampung pesan anomali / deteksi pintar
+  String? _pesanAnomali;
+
+  // Default nampilin 1 bulan sesuai standar medis
   int _jumlahBulanDipilih = 1; 
 
   @override
@@ -79,7 +82,7 @@ class _StatistikPertumbuhanScreenState extends State<StatistikPertumbuhanScreen>
     }
   }
 
-  // --- [DITAMBAHKAN] FUNGSI STANDAR KBM KEMENKES ---
+  // --- FUNGSI STANDAR KBM KEMENKES ---
   double _getTargetKBM(int usiaBulan) {
     if (usiaBulan <= 1) return 0.8; // 800 gram
     if (usiaBulan == 2) return 0.9; 
@@ -93,6 +96,8 @@ class _StatistikPertumbuhanScreenState extends State<StatistikPertumbuhanScreen>
   }
 
   void _tentukanKesimpulan() {
+    _pesanAnomali = null; // Reset pesan anomali setiap kali refresh
+
     if (_riwayat.isEmpty) {
       _jenisKesimpulan = "Belum Ada Data";
       _kesimpulan = "Halo Bunda! Belum ada data ukuran nih. Yuk catat data pertama ${widget.namaAnak} supaya kita bisa pantau tumbuh kembangnya sama-sama! 💕";
@@ -102,10 +107,29 @@ class _StatistikPertumbuhanScreenState extends State<StatistikPertumbuhanScreen>
     }
 
     double bbSekarang = (_riwayat.last['berat_badan'] ?? 0).toDouble();
-    
-    // Mengambil usia anak saat ini dari riwayat terakhir (asumsi ada field usia_bulan di tabel pertumbuhan)
-    // Jika tidak ada, default ke 12 bulan sebagai pengaman
     int usiaBulanSekarang = int.tryParse(_riwayat.last['usia_bulan']?.toString() ?? '12') ?? 12;
+
+    // --- [DITAMBAHKAN] LOGIKA DETEKSI ANOMALI / MESIN PINTAR ---
+    if (_riwayat.length >= 2) {
+      double bbSebelumnya = (_riwayat[_riwayat.length - 2]['berat_badan'] ?? 0).toDouble();
+      double selisihBB = bbSekarang - bbSebelumnya;
+      double selisihAbs = selisihBB.abs();
+
+      // 1. Cek kemungkinan salah ketik (Lonjakan ekstrem > 4 kg sebulan)
+      if (selisihAbs >= 4.0) {
+        String status = selisihBB > 0 ? "naik" : "turun";
+        _pesanAnomali = "Wah Bun, berat badannya tiba-tiba $status drastis banget nih (${selisihAbs.toStringAsFixed(1)} kg). Coba pastikan tidak ada salah ketik angka ya saat mencatat tadi! ✨";
+      } 
+      // 2. Cek penurunan (Mungkin sakit atau nafsu makan turun)
+      else if (selisihBB <= -0.5) {
+        _pesanAnomali = "Bun, berat badan ${widget.namaAnak} turun ${selisihAbs.toStringAsFixed(1)} kg nih dibanding bulan lalu. Kalau si Kecil habis sakit atau kurang nafsu makan, yuk jangan ragu konsultasi ke Bidan atau Dokter Anak biar cepat pulih! 💖";
+      } 
+      // 3. Cek kenaikan terlalu ekstrem (Risiko overweight jika bukan typo)
+      else if (selisihBB >= 2.0) {
+        _pesanAnomali = "Wah, berat badannya naik cepat sekali bulan ini (naik ${selisihBB.toStringAsFixed(1)} kg), Bun! Pastikan tetap seimbang ya. Boleh banget didiskusikan ke Bidan atau Dokter biar pertumbuhannya tetap terpantau ideal! 🌟";
+      }
+    }
+    // -------------------------------------------------------------
 
     List<Map<String, dynamic>> prediksiBBList = _listPrediksi
         .where((p) => p['metrik'] == 'berat_badan')
@@ -118,7 +142,6 @@ class _StatistikPertumbuhanScreenState extends State<StatistikPertumbuhanScreen>
       double prediksiBulanPertama = double.tryParse(prediksiBBList.first['nilai_prediksi'].toString()) ?? 0.0;
       double selisihPrediksi = prediksiBulanPertama - bbSekarang;
       
-      // [DIPERBAIKI] Target KBM dinamis berdasarkan usia anak bulan depan
       double targetKBM = _getTargetKBM(usiaBulanSekarang + 1); 
       
       if (selisihPrediksi >= targetKBM) {
@@ -137,7 +160,6 @@ class _StatistikPertumbuhanScreenState extends State<StatistikPertumbuhanScreen>
       String deretPrediksi = "${bbSekarang.toStringAsFixed(1)} kg ➔ ${teksAngka.join(" kg ➔ ")}";
       
       _jenisKesimpulan = "Pantauan Gizi: $_statusGiziAktual";
-      
       if (_statusGiziAktual.toLowerCase().contains('normal') || _statusGiziAktual.toLowerCase().contains('baik')) {
         _butuhKonsultasi = false; 
         _kesimpulan = "Berdasarkan standar Kemenkes, pertumbuhan ${widget.namaAnak} sangat baik lho, Bun! Berdasarkan pola saat ini, perkiraan berat hingga $_jumlahBulanDipilih bulan ke depan adalah $deretPrediksi kg. Pertahankan asupan nutrisi bergizinya ya! 💖";
@@ -147,23 +169,22 @@ class _StatistikPertumbuhanScreenState extends State<StatistikPertumbuhanScreen>
       }
       return; 
     }
-
     _infoKBM = "";
     _butuhKonsultasi = false;
-
     if (_riwayat.length == 1) {
       _jenisKesimpulan = "Awal yang Baik";
       _kesimpulan = "Wah, data pertama ${widget.namaAnak} sudah masuk! Terus pantau dan catat ya Bun tiap bulannya untuk melihat grafiknya. Bunda pasti bisa! 💖";
       return;
     }
-
+    
+    // Logika fallback jika tidak ada prediksi
     double bbSebelumnya = (_riwayat[_riwayat.length - 2]['berat_badan'] ?? 0).toDouble();
-    double selisihBB = bbSekarang - bbSebelumnya;
+    double selisihBBSekarang = bbSekarang - bbSebelumnya;
 
-    if (selisihBB < 0) {
+    if (selisihBBSekarang < 0) {
       _jenisKesimpulan = "Berat Badan Turun";
       _kesimpulan = "Bulan ini grafik ${widget.namaAnak} sedikit menurun nih. Wajar kok Bun, anak kadang susah makan. Jangan terlalu stres ya. Coba tawarkan cemilan padat gizi pelan-pelan. 🫂";
-    } else if (selisihBB >= 1.0) {
+    } else if (selisihBBSekarang >= 1.0) {
       _jenisKesimpulan = "Naik Signifikan";
       _kesimpulan = "Wah, bulan ini ${widget.namaAnak} melesat pertumbuhannya! Pastikan badannya tetap nyaman ya Bun. Semangat terus! 🚀";
     } else if (bbSekarang < 5.0) { 
@@ -195,34 +216,99 @@ class _StatistikPertumbuhanScreenState extends State<StatistikPertumbuhanScreen>
       ),
       body: _isLoading 
         ? Center(child: CircularProgressIndicator(color: navyDark))
-        : SingleChildScrollView(
-            physics: const BouncingScrollPhysics(),
-            padding: const EdgeInsets.all(20),
+        : RefreshIndicator(
+            color: brightPink,
+            backgroundColor: softPink,
+            onRefresh: _fetchRiwayatPertumbuhan,
+            child: SingleChildScrollView(
+              physics: const AlwaysScrollableScrollPhysics(), 
+              padding: const EdgeInsets.all(20),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  _buildInfoCard(genderText), 
+                  const SizedBox(height: 15),
+
+                  // --- [DITAMBAHKAN] KARTU INSIGHT ANOMALI ---
+                  _buildInsightCard(),
+                  
+                  _buildStatusGiziBox(),
+                  const SizedBox(height: 25),
+                  
+                  _buildDropdownPrediksi(), 
+                  const SizedBox(height: 20),
+
+                  _buildSummaryBox(),
+                  
+                  const SizedBox(height: 15),
+                  _buildActionInsight(),
+
+                  const SizedBox(height: 25),
+                  _buildChartContainer("Grafik Berat Badan (Kg)", true),
+                  const SizedBox(height: 25),
+                  _buildChartContainer("Grafik Tinggi Badan (Cm)", false),
+                  const SizedBox(height: 40),
+                ],
+              ),
+            ),
+          ),
+    );
+  }
+
+  // --- [DITAMBAHKAN] WIDGET KARTU PESAN ANOMALI BUNDA ---
+  Widget _buildInsightCard() {
+    if (_pesanAnomali == null) return const SizedBox.shrink();
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 15),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: const Color(0xFFFFF3F3), 
+        borderRadius: BorderRadius.circular(15),
+        border: Border.all(color: highlightPink, width: 1.5), 
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.05),
+            blurRadius: 5,
+            offset: const Offset(0, 3),
+          )
+        ],
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(
+            Icons.tips_and_updates_rounded, 
+            color: brightPink, 
+            size: 28
+          ),
+          const SizedBox(width: 12),
+          Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                _buildInfoCard(genderText), 
-                const SizedBox(height: 15),
-
-                _buildStatusGiziBox(),
-                const SizedBox(height: 25),
-                
-                _buildDropdownPrediksi(), 
-                const SizedBox(height: 20),
-
-                _buildSummaryBox(),
-                
-                const SizedBox(height: 15),
-                _buildActionInsight(),
-
-                const SizedBox(height: 25),
-                _buildChartContainer("Grafik Berat Badan (Kg)", true),
-                const SizedBox(height: 25),
-                _buildChartContainer("Grafik Tinggi Badan (Cm)", false),
-                const SizedBox(height: 40),
+                Text(
+                  "Pesan Khusus untuk Bunda",
+                  style: TextStyle(
+                    color: navyDark, 
+                    fontWeight: FontWeight.bold,
+                    fontSize: 14,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  _pesanAnomali!,
+                  style: TextStyle(
+                    color: navyDark.withOpacity(0.8),
+                    fontSize: 13,
+                    height: 1.4,
+                  ),
+                ),
               ],
             ),
           ),
+        ],
+      ),
     );
   }
 
@@ -330,7 +416,6 @@ class _StatistikPertumbuhanScreenState extends State<StatistikPertumbuhanScreen>
               icon: Icon(Icons.keyboard_arrow_down, color: navyDark),
               dropdownColor: softPink,
               style: TextStyle(color: navyDark, fontWeight: FontWeight.bold, fontSize: 15),
-              // [DIPERBAIKI] Pilihan maksimal direduksi menjadi 3 Bulan sesuai standar klinis
               items: [1, 2, 3].map((int value) {
                 return DropdownMenuItem<int>(
                   value: value,

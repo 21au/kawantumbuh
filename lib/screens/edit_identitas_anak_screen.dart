@@ -25,13 +25,9 @@ class _EditDataAnakScreenState extends State<EditDataAnakScreen> {
   
   final List<String> golDarahList = ['A', 'B', 'AB', 'O', 'Belum Tahu'];
 
-  // Menggunakan nama controller persis seperti kode aslimu
+  // Hanya menyisakan controller yang berhubungan dengan anak
   late TextEditingController _namaController;
   late TextEditingController _dateController;
-  late TextEditingController _namaIbuController;
-  late TextEditingController _namaAyahController;
-  late TextEditingController _alamatController;
-  late TextEditingController _noTelpController;
   late TextEditingController _catatanAlergiController;
 
   @override
@@ -40,10 +36,6 @@ class _EditDataAnakScreenState extends State<EditDataAnakScreen> {
     // Isi otomatis form dengan data yang sudah ada di database
     _namaController = TextEditingController(text: widget.dataAnak['nama'] ?? '');
     _dateController = TextEditingController(text: widget.dataAnak['tanggal_lahir'] ?? '');
-    _namaIbuController = TextEditingController(text: widget.dataAnak['nama_ibu'] ?? '');
-    _namaAyahController = TextEditingController(text: widget.dataAnak['nama_ayah'] ?? '');
-    _alamatController = TextEditingController(text: widget.dataAnak['alamat'] ?? '');
-    _noTelpController = TextEditingController(text: widget.dataAnak['no_telp'] ?? '');
     _catatanAlergiController = TextEditingController(text: widget.dataAnak['catatan_alergi'] ?? '');
     
     selectedGender = widget.dataAnak['jenis_kelamin'] ?? 'Perempuan';
@@ -58,10 +50,6 @@ class _EditDataAnakScreenState extends State<EditDataAnakScreen> {
   void dispose() {
     _namaController.dispose();
     _dateController.dispose();
-    _namaIbuController.dispose();
-    _namaAyahController.dispose();
-    _alamatController.dispose();
-    _noTelpController.dispose();
     _catatanAlergiController.dispose();
     super.dispose();
   }
@@ -76,10 +64,7 @@ class _EditDataAnakScreenState extends State<EditDataAnakScreen> {
         'jenis_kelamin': selectedGender,
         'tanggal_lahir': _dateController.text,
         'golongan_darah': selectedGolDarah,
-        'nama_ibu': _namaIbuController.text,
-        'nama_ayah': _namaAyahController.text,
-        'alamat': _alamatController.text,
-        'no_telp': _noTelpController.text,
+        // Data ortu dan kontak dihapus dari update ini
         'catatan_alergi': _catatanAlergiController.text,
       }).eq('id', widget.dataAnak['id']);
 
@@ -162,7 +147,7 @@ class _EditDataAnakScreenState extends State<EditDataAnakScreen> {
                 ),
                 const SizedBox(height: 15),
                 const Text("Data Anak", style: TextStyle(color: Colors.white, fontSize: 24, fontWeight: FontWeight.bold)),
-                Text("Lengkapi identitas si kecil", style: TextStyle(color: Colors.white.withOpacity(0.8), fontSize: 13)),
+                Text("Lengkapi identitas & rekam medis si kecil", style: TextStyle(color: Colors.white.withOpacity(0.8), fontSize: 13)),
               ],
             ),
           ),
@@ -202,35 +187,7 @@ class _EditDataAnakScreenState extends State<EditDataAnakScreen> {
                   ),
                   const SizedBox(height: 15),
 
-                  // CARD 2: DATA ORANG TUA
-                  _buildSectionCard(
-                    icon: Icons.favorite_border,
-                    title: "Data Orang Tua",
-                    children: [
-                      _buildLabel("Nama Ibu", isRequired: true),
-                      _buildTextField(hint: "Nama lengkap ibu", icon: Icons.person_outline, controller: _namaIbuController),
-                      const SizedBox(height: 15),
-                      _buildLabel("Nama Ayah"),
-                      _buildTextField(hint: "Nama lengkap ayah", icon: Icons.person_outline, controller: _namaAyahController),
-                    ],
-                  ),
-                  const SizedBox(height: 15),
-
-                  // CARD 3: KONTAK
-                  _buildSectionCard(
-                    icon: Icons.call_outlined,
-                    title: "Kontak",
-                    children: [
-                      _buildLabel("Alamat Lengkap"),
-                      _buildTextField(hint: "Jalan, RT/RW, Kecamatan", maxLines: 2, controller: _alamatController),
-                      const SizedBox(height: 15),
-                      _buildLabel("Nomor Telepon"),
-                      _buildTextField(hint: "08xx xxxx xxxx", icon: Icons.call_outlined, keyboardType: TextInputType.phone, controller: _noTelpController),
-                    ],
-                  ),
-                  const SizedBox(height: 15),
-
-                  // CARD 4: CATATAN KESEHATAN
+                  // CARD 2: CATATAN KESEHATAN (Bagian Kontak & Ortu sudah dihapus)
                   _buildSectionCard(
                     icon: Icons.medical_information_outlined,
                     title: "Catatan Medis",

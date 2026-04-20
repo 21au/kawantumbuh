@@ -52,14 +52,21 @@ class _AnakScreenState extends State<AnakScreen> {
   Future<void> _fetchDataAnak() async {
     if (!mounted) return;
     setState(() => _isLoading = true);
+    
     try {
       final user = Supabase.instance.client.auth.currentUser;
       if (user == null) return;
 
+      String? currentSelectedId;
+      if (_daftarAnak.isNotEmpty && selectedIndex < _daftarAnak.length) {
+        currentSelectedId = _daftarAnak[selectedIndex]['id'].toString();
+      }
+
       final dataAnak = await Supabase.instance.client
           .from('anak')
           .select()
-          .eq('user_id', user.id);
+          .eq('user_id', user.id)
+          .order('created_at', ascending: true); 
 
       if (mounted) {
         setState(() {
@@ -67,10 +74,16 @@ class _AnakScreenState extends State<AnakScreen> {
         });
 
         if (_daftarAnak.isNotEmpty) {
-          if (selectedIndex >= _daftarAnak.length) selectedIndex = 0;
+          if (currentSelectedId != null) {
+            int foundIndex = _daftarAnak.indexWhere((anak) => anak['id'].toString() == currentSelectedId);
+            selectedIndex = foundIndex != -1 ? foundIndex : 0;
+          } else {
+            if (selectedIndex >= _daftarAnak.length) selectedIndex = 0;
+          }
+          
           await _fetchRiwayat(selectedIndex);
         } else {
-            setState(() => _isLoading = false);
+          setState(() => _isLoading = false);
         }
       }
     } catch (e) {
@@ -160,6 +173,28 @@ class _AnakScreenState extends State<AnakScreen> {
     }
   }
 
+  bool _cekLonjakanDrastis(List<Map<String, dynamic>> historyData) {
+    if (historyData.length < 2) return false;
+
+    final dataTerakhir = historyData[0];
+    final dataSebelumnya = historyData[1];
+
+    double bbTerakhir = double.tryParse(dataTerakhir['berat_badan'].toString()) ?? 0.0;
+    double bbSebelum = double.tryParse(dataSebelumnya['berat_badan'].toString()) ?? 0.0;
+    
+    double tbTerakhir = double.tryParse(dataTerakhir['tinggi_badan'].toString()) ?? 0.0;
+    double tbSebelum = double.tryParse(dataSebelumnya['tinggi_badan'].toString()) ?? 0.0;
+
+    double selisihBB = (bbTerakhir - bbSebelum).abs();
+    double selisihTB = tbTerakhir - tbSebelum; 
+
+    if (selisihBB > 1.5 || selisihTB > 4.0 || selisihTB < 0) {
+      return true; 
+    }
+    
+    return false;
+  }
+
   List<Map<String, double>> _getChartData(String? tglLahir) {
     if (_riwayatPertumbuhan.isEmpty || tglLahir == null) return [];
     
@@ -169,7 +204,7 @@ class _AnakScreenState extends State<AnakScreen> {
     } catch (e) {
       return [];
     }
-
+    
     var recentData = _riwayatPertumbuhan.toList();
     recentData = recentData.reversed.toList(); 
 
@@ -195,8 +230,7 @@ class _AnakScreenState extends State<AnakScreen> {
   void _handleTouch(double dx, double chartWidth, List<Map<String, double>> chartData) {
     if (chartData.isEmpty) return;
     
-    // Cari index terdekat dengan titik sentuh x berdasarkan lebar grafik (bukan layar)
-    double tapAge = (dx / chartWidth) * 60; // 60 adalah maxAge
+    double tapAge = (dx / chartWidth) * 60; 
     int closestIndex = 0;
     double minDiff = double.infinity;
     
@@ -213,34 +247,32 @@ class _AnakScreenState extends State<AnakScreen> {
     });
   }
 
-  // --- HELPER UNTUK LOGIKA WARNA STATUS GIZI ---
   Color _getStatusColor(String rawStatus) {
     if (rawStatus.isEmpty || rawStatus == "Menunggu Data") return navyDark;
     
     String statusLower = rawStatus.toLowerCase();
     
     if (statusLower.contains("normal") || statusLower.contains("baik")) {
-      return successGreen; // Hijau
+      return successGreen; 
     } else if (statusLower.contains("risiko") || statusLower.contains("lebih") || statusLower.contains("tinggi")) {
-      return Colors.orangeAccent.shade700; // Kuning (Oranye gelap agar teks putih tetap terbaca)
+      return Colors.orangeAccent.shade700; 
     } else if (statusLower.contains("kurang") || statusLower.contains("buruk") || statusLower.contains("pendek")) {
-      return Colors.redAccent; // Merah
+      return Colors.redAccent; 
     }
-    return navyDark; // Default
+    return navyDark; 
   }
 
-  // --- HELPER UNTUK LOGIKA TEKS STATUS GIZI ---
   String _getStatusMessage(String rawStatus) {
     if (rawStatus.isEmpty || rawStatus == "Menunggu Data") return "Menunggu Data";
     
     String statusLower = rawStatus.toLowerCase();
     
     if (statusLower.contains("normal") || statusLower.contains("baik")) {
-      return rawStatus; // Teks biasa
+      return rawStatus; 
     } else if (statusLower.contains("risiko") || statusLower.contains("lebih") || statusLower.contains("tinggi")) {
-      return "Beresiko: $rawStatus"; // Tambah Beresiko
+      return "Beresiko: $rawStatus"; 
     } else if (statusLower.contains("kurang") || statusLower.contains("buruk") || statusLower.contains("pendek")) {
-      return "Beresiko: $rawStatus"; // Tambah Sangat Beresiko
+      return "Beresiko: $rawStatus"; 
     }
     return rawStatus;
   }
@@ -256,6 +288,7 @@ class _AnakScreenState extends State<AnakScreen> {
     }
 
     final currentChild = _daftarAnak[selectedIndex];
+    bool adaLonjakan = _cekLonjakanDrastis(_riwayatPertumbuhan);
 
     return Scaffold(
       backgroundColor: softPink,
@@ -268,15 +301,26 @@ class _AnakScreenState extends State<AnakScreen> {
             children: [
               _buildHeader(currentChild),
               const SizedBox(height: 25),
+              
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 20),
+                child: CatatanMedisCard(
+                  catatanAlergi: currentChild['catatan_alergi'],
+                ),
+              ),
+
               _buildToggleSection(),
               const SizedBox(height: 25),
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 20),
                 child: Column(
                   children: [
+                    if (adaLonjakan) _buildWarningAnomali(),
+
                     _buildDynamicChartCard(currentChild),
                     const SizedBox(height: 20),
-                    _buildStatusPertumbuhan(currentChild['nama'] ?? "Si Kecil"),
+                    // Perubahan Parameter untuk Analysis Section
+                    _buildStatusPertumbuhan(currentChild),
                     const SizedBox(height: 20),
                     _buildPrediksiGizi(),
                     const SizedBox(height: 30),
@@ -294,22 +338,67 @@ class _AnakScreenState extends State<AnakScreen> {
     );
   }
 
-  Widget _buildStatusPertumbuhan(String name) {
+  Widget _buildWarningAnomali() {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 20),
+      padding: const EdgeInsets.all(15),
+      decoration: BoxDecoration(
+        color: const Color(0xFFFFF3CD),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: const Color(0xFFFFE69C)),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Icon(Icons.warning_amber_rounded, color: Color(0xFF997404), size: 30),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: const [
+                Text(
+                  "Perhatian, Bun! ⚠️",
+                  style: TextStyle(fontWeight: FontWeight.bold, color: Color(0xFF997404), fontSize: 15),
+                ),
+                SizedBox(height: 5),
+                Text(
+                  "Sistem mendeteksi ada lonjakan data yang kurang wajar di pengukuran terakhir. Yuk, pastikan lagi tidak ada salah ketik ya!\n\nNamun, jika datanya sudah benar, ini bisa jadi indikator anak sedang sakit atau ada risiko kesehatan lainnya. Sebaiknya segera konsultasikan dengan Bidan atau Dokter Anak ya, Bun.",
+                  style: TextStyle(color: Color(0xFF664D03), fontSize: 13, height: 1.4),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // --- BAGIAN INI DIREVISI UNTUK MEMASUKKAN CATATAN MEDIS ---
+  Widget _buildStatusPertumbuhan(Map<String, dynamic> child) {
+    String name = child['nama'] ?? "Si Kecil";
     String rawStatus = _prediksiTerbaru?['status_gizi'] ?? "";
+    String catatanMedis = child['catatan_alergi'] ?? "";
+    
+    // Cek apakah anak punya catatan medis valid
+    bool adaCatatan = catatanMedis.trim().isNotEmpty && 
+                      catatanMedis.trim() != '-' && 
+                      catatanMedis.toLowerCase() != 'tidak ada';
     
     bool isInvalid = rawStatus.isEmpty || 
                      rawStatus.toLowerCase().contains("gagal") || 
-                     rawStatus.toLowerCase().contains("luar jangkauan");
+                     rawStatus.toLowerCase().contains("luar jangkauan") ||
+                     _riwayatPertumbuhan.length < 3; 
+
     String judul = "💡 Hasil Analisis & Prediksi";
     String pesan = "";
     Color boxColor = fieldPink;
     IconData iconData = Icons.analytics_outlined;
+
     if (isInvalid) {
-      pesan = "Data belum cukup untuk prediksi (Minimal 3 data). Yuk, rutin catat pertumbuhan $name setiap bulan!";
+      pesan = "Data belum cukup untuk diprediksi (Butuh minimal 3 data berurutan). Yuk, rutin catat pertumbuhan $name setiap bulan agar AI bisa membantumu!";
       boxColor = Colors.orangeAccent.withOpacity(0.3);
     } else {
       String statusLower = rawStatus.toLowerCase();
-      // Menggunakan helper message agar di teks deskripsi juga muncul kata "Beresiko"
       String formattedStatus = _getStatusMessage(rawStatus);
       pesan = "Berdasarkan tren grafik $name, Prediksi status gizinya bulan depan berpotensi mengarah ke: *$formattedStatus*.\n\n";
 
@@ -320,14 +409,19 @@ class _AnakScreenState extends State<AnakScreen> {
       } else if (statusLower.contains("risiko") || statusLower.contains("lebih") || statusLower.contains("tinggi")) {
         boxColor = Colors.orangeAccent.withOpacity(0.7);
         iconData = Icons.warning_amber_rounded;
-        pesan += "Saran untuk Bunda:\nJangan panik Bun, ini baru prediksi awal. Coba mulai kontrol porsi asupannya dan hindari camilan/minuman manis berlebih. Ajak si kecil lebih banyak beraktivitas fisik (seperti merangkak atau bermain aktif). Konsultasikan ke bidan/dokter jika perlu.";
+        pesan += "Saran untuk Bunda:\nJangan panik Bun, ini baru prediksi awal. Coba mulai kontrol porsi asupannya dan hindari camilan/minuman manis berlebih. Ajak si kecil lebih banyak beraktivitas fisik. Konsultasikan ke bidan/dokter jika perlu.";
       } else if (statusLower.contains("kurang") || statusLower.contains("buruk") || statusLower.contains("pendek")) {
         boxColor = Colors.redAccent.withOpacity(0.7);
         iconData = Icons.error_outline;
-        pesan += "Saran untuk Bunda:\nBunda, yuk kita kejar pertumbuhannya! Tambahkan porsi Protein Hewani (seperti telur, ikan, daging, atau hati ayam) dan lemak tambahan (minyak/mentega/santan) di menu hariannya, pastikan di luar makanan yang bikin alergi ya. Jangan ragu untuk segera konsultasi ke Puskesmas/Dokter Anak.";
+        pesan += "Saran untuk Bunda:\nBunda, yuk kita kejar pertumbuhannya! Tambahkan porsi Protein Hewani dan lemak tambahan di menu hariannya. Jangan ragu untuk segera konsultasi ke Puskesmas/Dokter Anak.";
       } else {
         boxColor = fieldPink;
         pesan += "Saran untuk Bunda:\nTetap pantau kurva pertumbuhannya dengan teliti dan konsultasikan dengan tenaga kesehatan di Posyandu/Klinik terdekat.";
+      }
+
+      // Tambahkan warning medis khusus ke dalam pesan analisis
+      if (adaCatatan) {
+        pesan += "\n\n⚠️ Catatan Medis Khusus:\nBunda, harap diingat bahwa $name memiliki riwayat \"$catatanMedis\". Pastikan setiap penyesuaian gizi dan menu harian tetap aman dari pantangan tersebut ya!";
       }
     }
     return Container(
@@ -354,7 +448,10 @@ class _AnakScreenState extends State<AnakScreen> {
   Widget _buildPrediksiGizi() {
     String rawStatus = _prediksiTerbaru?['status_gizi'] ?? "Menunggu Data";
     
-    // Ambil Warna dan Teks yang sudah diformat dari Helper
+    if (_riwayatPertumbuhan.length < 3) {
+      rawStatus = "Butuh 3 Data";
+    }
+
     Color badgeColor = _getStatusColor(rawStatus);
     String displayStatus = _getStatusMessage(rawStatus);
 
@@ -391,7 +488,6 @@ class _AnakScreenState extends State<AnakScreen> {
                 Flexible(
                   child: Container(
                     padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                    // Warna box mengambil dari fungsi helper
                     decoration: BoxDecoration(color: badgeColor, borderRadius: BorderRadius.circular(10)),
                     child: Text(
                       displayStatus.toUpperCase(), 
@@ -432,6 +528,7 @@ class _AnakScreenState extends State<AnakScreen> {
     );
   }
 
+  // --- BAGIAN INI DIREVISI UNTUK MENAMBAH SEKAT DROPDOWN ---
   Widget _buildChildSelector() {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
@@ -447,12 +544,34 @@ class _AnakScreenState extends State<AnakScreen> {
           icon: Icon(Icons.keyboard_arrow_down_rounded, color: softPink, size: 28),
           dropdownColor: navyDark, 
           style: TextStyle(color: softPink, fontSize: 16, fontWeight: FontWeight.bold),
+          // selectedItemBuilder digunakan agar sekat tidak muncul di judul tombol utama
+          selectedItemBuilder: (BuildContext context) {
+            return _daftarAnak.map((anak) {
+              return Container(
+                alignment: Alignment.centerLeft,
+                child: Text(
+                  anak['nama'] ?? "Anak",
+                  style: const TextStyle(fontWeight: FontWeight.w600),
+                ),
+              );
+            }).toList();
+          },
           items: List.generate(_daftarAnak.length, (index) {
+            bool isLast = index == _daftarAnak.length - 1; // Item terakhir tidak perlu garis bawah
             return DropdownMenuItem<int>(
               value: index,
-              child: Text(
-                _daftarAnak[index]['nama'] ?? "Anak",
-                style: const TextStyle(fontWeight: FontWeight.w600),
+              child: Container(
+                width: double.infinity,
+                alignment: Alignment.centerLeft,
+                decoration: BoxDecoration(
+                  border: isLast ? null : Border(
+                    bottom: BorderSide(color: softPink.withOpacity(0.2), width: 1.0)
+                  )
+                ),
+                child: Text(
+                  _daftarAnak[index]['nama'] ?? "Anak",
+                  style: const TextStyle(fontWeight: FontWeight.w600),
+                ),
               ),
             );
           }),
@@ -499,7 +618,15 @@ class _AnakScreenState extends State<AnakScreen> {
                 ),
               ),
               GestureDetector(
-                onTap: () => Navigator.push(context, MaterialPageRoute(builder: (context) => EditDataAnakScreen(dataAnak: child))),
+                onTap: () async {
+                  final result = await Navigator.push(
+                    context, 
+                    MaterialPageRoute(builder: (context) => EditDataAnakScreen(dataAnak: child))
+                  );
+                  if (result == true) {
+                    _fetchDataAnak();
+                  }
+                },
                 child: Container(
                   padding: const EdgeInsets.all(8),
                   decoration: BoxDecoration(color: highlightPink, shape: BoxShape.circle),
@@ -824,6 +951,77 @@ class _AnakScreenState extends State<AnakScreen> {
   }
 }
 
+// ============================================================================
+// CLASS CATATAN MEDIS CARD 
+// ============================================================================
+class CatatanMedisCard extends StatelessWidget {
+  final String? catatanAlergi;
+
+  const CatatanMedisCard({super.key, this.catatanAlergi});
+
+  @override
+  Widget build(BuildContext context) {
+    if (catatanAlergi == null || 
+        catatanAlergi!.trim().isEmpty || 
+        catatanAlergi!.trim() == '-' ||
+        catatanAlergi!.toLowerCase() == 'tidak ada') {
+      return const SizedBox.shrink(); 
+    }
+
+    return Container(
+      width: double.infinity,
+      margin: const EdgeInsets.only(bottom: 20), 
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: const Color(0xFFFFF0F0), 
+        borderRadius: BorderRadius.circular(15),
+        border: Border.all(color: Colors.redAccent.withOpacity(0.3), width: 1),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            padding: const EdgeInsets.all(8),
+            decoration: BoxDecoration(
+              color: Colors.redAccent.withOpacity(0.1),
+              shape: BoxShape.circle,
+            ),
+            child: const Icon(Icons.medical_information_outlined, color: Colors.redAccent, size: 24),
+          ),
+          const SizedBox(width: 15),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  "Catatan Medis & Alergi",
+                  style: TextStyle(
+                    color: Colors.redAccent,
+                    fontSize: 14,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                const SizedBox(height: 6),
+                Text(
+                  catatanAlergi!,
+                  style: const TextStyle(
+                    color: Color(0xFF102C57), 
+                    fontSize: 13,
+                    height: 1.4,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// ============================================================================
+// CLASS DYNAMIC CHART PAINTER
+// ============================================================================
 class DynamicChartPainter extends CustomPainter {
   final List<Map<String, double>> dataPoints;
   final bool isBerat;
@@ -901,7 +1099,6 @@ class DynamicChartPainter extends CustomPainter {
       for (var point in topList) { path.lineTo(point.dx, point.dy); }
       for (var point in bottomList.reversed) { path.lineTo(point.dx, point.dy); }
       path.close();
-      // Gunakan withOpacity supaya Grid-nya kelihatan nembus!
       canvas.drawPath(path, Paint()..color = color.withOpacity(0.5)..style = PaintingStyle.fill);
     }
 
@@ -928,32 +1125,29 @@ class DynamicChartPainter extends CustomPainter {
         else path.lineTo(pt.dx, pt.dy);
       }
 
-      // Bikin Outline putih dulu biar garis hitamnya stand out dan nggak nyaru dengan background hijau
+      // Outline putih
       canvas.drawPath(path, Paint()
         ..color = Colors.white 
         ..strokeWidth = 6.0 
         ..strokeJoin = StrokeJoin.round
         ..style = PaintingStyle.stroke);
 
-      // Gambar Garis Sambungan Asli
+      // Garis Sambungan Asli
       canvas.drawPath(path, Paint()
         ..color = const Color(0xFF102C57) 
         ..strokeWidth = 3.0 
         ..strokeJoin = StrokeJoin.round
         ..style = PaintingStyle.stroke);
 
-      // Gambar Lingkaran Titik
+      // Lingkaran Titik
       for (int i = 0; i < pointOffsets.length; i++) {
         var pt = pointOffsets[i];
         
-        // Outline putih luar (Lebih besar)
         canvas.drawCircle(pt, 7.0, Paint()..color = Colors.white..style = PaintingStyle.fill); 
-        // Titik Dalam
         canvas.drawCircle(pt, 4.5, Paint()..color = const Color(0xFF102C57)..style = PaintingStyle.fill);
 
         // Render Tooltip 
         if (touchedIndex == i) {
-          // Efek bulatan besar saat disentuh
           canvas.drawCircle(pt, 12.0, Paint()..color = Colors.blueAccent.withOpacity(0.3)..style = PaintingStyle.fill);
 
           final val = dataPoints[i]['nilai'];

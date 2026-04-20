@@ -164,22 +164,27 @@ class _DashboardScreenState extends State<DashboardScreen> {
     return "${days[now.weekday]}, ${now.day} ${months[now.month]} ${now.year}";
   }
 
-  // --- FUNGSI MUNCULKAN DROPDOWN PILIH ANAK ---
+  // --- FUNGSI MUNCULKAN DROPDOWN PILIH ANAK (SUDAH DIPERBAIKI!) ---
   void _tampilkanPilihAnak() {
     if (_daftarAnak.isEmpty) return;
 
     showModalBottomSheet(
       context: context,
       backgroundColor: Colors.transparent,
+      isScrollControlled: true, // KUNCI 1: Izinkan popup menyesuaikan tinggi
       builder: (context) {
         return Container(
-          padding: const EdgeInsets.all(24),
+          padding: const EdgeInsets.only(top: 24, left: 24, right: 24, bottom: 10),
+          // KUNCI 2: Batasi tinggi maksimal agar tidak bablas sampai ujung atas layar
+          constraints: BoxConstraints(
+            maxHeight: MediaQuery.of(context).size.height * 0.65, 
+          ),
           decoration: BoxDecoration(
             color: softPink,
             borderRadius: const BorderRadius.vertical(top: Radius.circular(30)),
           ),
           child: Column(
-            mainAxisSize: MainAxisSize.min,
+            mainAxisSize: MainAxisSize.min, // Sesuaikan tinggi dengan isi
             children: [
               Container(
                 width: 50, height: 5,
@@ -188,30 +193,44 @@ class _DashboardScreenState extends State<DashboardScreen> {
               const SizedBox(height: 20),
               Text("Pilih Anak", style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: navyDark)),
               const SizedBox(height: 20),
-              ...List.generate(_daftarAnak.length, (index) {
-                final anak = _daftarAnak[index];
-                final isSelected = index == _selectedAnakIndex;
-                return ListTile(
-                  leading: CircleAvatar(
-                    backgroundColor: isSelected ? navyDark : highlightPink,
-                    child: Icon(Icons.child_care, color: softPink),
-                  ),
-                  title: Text(anak['nama'] ?? "Anak", style: TextStyle(color: navyDark, fontWeight: FontWeight.bold)),
-                  trailing: isSelected ? Icon(Icons.check_circle, color: navyDark) : null,
-                  onTap: () {
-                    setState(() {
-                      _selectedAnakIndex = index;
-                      _beratBadan = "-"; 
-                      _tinggiBadan = "-";
-                      _hasJadwalBesok = false; // Reset notif saat ganti anak
-                    });
-                    _fetchRiwayatTerakhir(anak['id']);
-                    _cekJadwalBesok(anak['id'].toString()); // Cek lagi jadwal untuk anak yang baru dipilih
-                    Navigator.pop(context);
+              
+              // KUNCI 3: Bungkus ListView dengan Expanded agar bisa di-scroll dengan mulus
+              Expanded(
+                child: ListView.builder(
+                  shrinkWrap: true, // KUNCI 4: Pastikan ListView tidak memakan ruang tanpa batas
+                  physics: const BouncingScrollPhysics(),
+                  itemCount: _daftarAnak.length,
+                  itemBuilder: (context, index) {
+                    final anak = _daftarAnak[index];
+                    final isSelected = index == _selectedAnakIndex;
+                    return Padding(
+                      padding: const EdgeInsets.only(bottom: 8.0),
+                      child: ListTile(
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
+                        tileColor: isSelected ? highlightPink.withOpacity(0.3) : Colors.transparent,
+                        leading: CircleAvatar(
+                          backgroundColor: isSelected ? navyDark : highlightPink,
+                          child: Icon(Icons.child_care, color: softPink),
+                        ),
+                        title: Text(anak['nama'] ?? "Anak", style: TextStyle(color: navyDark, fontWeight: FontWeight.bold)),
+                        trailing: isSelected ? Icon(Icons.check_circle, color: navyDark) : null,
+                        onTap: () {
+                          setState(() {
+                            _selectedAnakIndex = index;
+                            _beratBadan = "-"; 
+                            _tinggiBadan = "-";
+                            _hasJadwalBesok = false; // Reset notif saat ganti anak
+                          });
+                          _fetchRiwayatTerakhir(anak['id']);
+                          _cekJadwalBesok(anak['id'].toString()); // Cek lagi jadwal untuk anak yang baru dipilih
+                          Navigator.pop(context);
+                        },
+                      ),
+                    );
                   },
-                );
-              }),
-              const SizedBox(height: 20),
+                ),
+              ),
+              const SizedBox(height: 10),
             ],
           ),
         );

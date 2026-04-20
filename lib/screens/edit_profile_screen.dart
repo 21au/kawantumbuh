@@ -9,8 +9,13 @@ class EditProfileScreen extends StatefulWidget {
 }
 
 class _EditProfileScreenState extends State<EditProfileScreen> {
-  final TextEditingController _namaController = TextEditingController();
+  final TextEditingController _namaIbuController = TextEditingController();
+  final TextEditingController _namaAyahController = TextEditingController();
+  final TextEditingController _pekerjaanIbuController = TextEditingController();
+  final TextEditingController _pekerjaanAyahController = TextEditingController();
+  final TextEditingController _alamatController = TextEditingController();
   final TextEditingController _teleponController = TextEditingController();
+  
   bool _isLoading = false;
 
   // --- PALET WARNA UTAMA BUNDA ---
@@ -38,12 +43,16 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
             .single();
 
         setState(() {
-          _namaController.text = (data['full_name'] ?? '').toString();
+          _namaIbuController.text = (data['full_name'] ?? '').toString();
+          _namaAyahController.text = (data['nama_ayah'] ?? '').toString();
+          _pekerjaanIbuController.text = (data['pekerjaan_ibu'] ?? '').toString();
+          _pekerjaanAyahController.text = (data['pekerjaan_ayah'] ?? '').toString();
+          _alamatController.text = (data['alamat'] ?? '').toString();
           _teleponController.text = phone;
         });
       } catch (e) {
         setState(() {
-          _namaController.text = (user.userMetadata?['nama'] ?? '').toString();
+          _namaIbuController.text = (user.userMetadata?['nama'] ?? '').toString();
           _teleponController.text = phone;
         });
       }
@@ -51,10 +60,10 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
   }
 
   Future<void> _saveProfile() async {
-    if (_namaController.text.trim().isEmpty) {
+    if (_namaIbuController.text.trim().isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: const Text("Nama tidak boleh kosong"), 
+          content: const Text("Nama Ibu tidak boleh kosong"), 
           backgroundColor: highlightPink,
         ),
       );
@@ -69,7 +78,11 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
 
       await Supabase.instance.client.from('profiles').upsert({
         'id': user.id,
-        'full_name': _namaController.text.trim(),
+        'full_name': _namaIbuController.text.trim(),
+        'nama_ayah': _namaAyahController.text.trim(),
+        'pekerjaan_ibu': _pekerjaanIbuController.text.trim(),
+        'pekerjaan_ayah': _pekerjaanAyahController.text.trim(),
+        'alamat': _alamatController.text.trim(),
         'updated_at': DateTime.now().toIso8601String(),
       });
 
@@ -100,7 +113,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
       appBar: AppBar(
         backgroundColor: navyDark,
         title: Text(
-          "Ubah Data Profil", 
+          "Ubah Identitas Orang Tua", 
           style: TextStyle(color: softPink, fontSize: 18, fontWeight: FontWeight.bold)
         ),
         iconTheme: IconThemeData(color: softPink),
@@ -118,32 +131,76 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
+            Container(
+              padding: const EdgeInsets.all(15),
+              margin: const EdgeInsets.only(bottom: 20),
+              decoration: BoxDecoration(
+                color: fieldPink.withOpacity(0.4),
+                borderRadius: BorderRadius.circular(15),
+                border: Border.all(color: highlightPink),
+              ),
+              child: Row(
+                children: [
+                  Icon(Icons.info_outline_rounded, color: navyDark),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Text(
+                      "Data ini disesuaikan dengan format Buku KIA untuk kelengkapan rekam medis anak.",
+                      style: TextStyle(color: navyDark, fontSize: 12, height: 1.4),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            
+            // --- DATA IBU ---
+            const Divider(),
             const SizedBox(height: 10),
-            _buildLabel("Nama Lengkap Bunda"),
+            Text("Data Ibu", style: TextStyle(color: navyDark, fontSize: 18, fontWeight: FontWeight.bold)),
+            const SizedBox(height: 15),
+            
+            _buildLabel("Nama Lengkap Ibu"),
+            _buildTextField(_namaIbuController, "Masukkan nama Ibu", Icons.face_3_outlined),
+            const SizedBox(height: 15),
+            
+            _buildLabel("Pekerjaan Ibu"),
+            _buildTextField(_pekerjaanIbuController, "Contoh: Ibu Rumah Tangga, Guru...", Icons.work_outline),
+            const SizedBox(height: 25),
+
+            // --- DATA AYAH ---
+            const Divider(),
+            const SizedBox(height: 10),
+            Text("Data Ayah", style: TextStyle(color: navyDark, fontSize: 18, fontWeight: FontWeight.bold)),
+            const SizedBox(height: 15),
+
+            _buildLabel("Nama Lengkap Ayah"),
+            _buildTextField(_namaAyahController, "Masukkan nama Ayah", Icons.face_6_outlined),
+            const SizedBox(height: 15),
+
+            _buildLabel("Pekerjaan Ayah"),
+            _buildTextField(_pekerjaanAyahController, "Contoh: Karyawan Swasta, PNS...", Icons.work_outline),
+            const SizedBox(height: 25),
+
+            // --- KONTAK & ALAMAT ---
+            const Divider(),
+            const SizedBox(height: 10),
+            Text("Informasi Kontak & Domisili", style: TextStyle(color: navyDark, fontSize: 18, fontWeight: FontWeight.bold)),
+            const SizedBox(height: 15),
+
+            _buildLabel("Alamat Lengkap"),
             TextField(
-              controller: _namaController,
+              controller: _alamatController,
+              maxLines: 3,
               style: TextStyle(color: navyDark, fontWeight: FontWeight.w600),
-              decoration: InputDecoration(
-                filled: true,
-                fillColor: Colors.white.withOpacity(0.5),
-                hintText: "Masukkan nama Bunda",
-                hintStyle: TextStyle(color: navyDark.withOpacity(0.3)),
-                prefixIcon: Icon(Icons.person_outline_rounded, color: navyDark),
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(20),
-                  borderSide: BorderSide(color: fieldPink),
-                ),
-                enabledBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(20),
-                  borderSide: BorderSide(color: fieldPink),
-                ),
-                focusedBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(20),
-                  borderSide: BorderSide(color: highlightPink, width: 2),
+              decoration: _inputDecoration("Masukkan alamat domisili saat ini").copyWith(
+                prefixIcon: Padding(
+                  padding: const EdgeInsets.only(bottom: 40), // Align icon to top
+                  child: Icon(Icons.home_outlined, color: navyDark),
                 ),
               ),
             ),
-            const SizedBox(height: 25),
+            const SizedBox(height: 15),
+
             _buildLabel("Nomor Telepon (ID)"),
             TextField(
               controller: _teleponController,
@@ -161,7 +218,9 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                 helperStyle: TextStyle(color: navyDark.withOpacity(0.4), fontSize: 11),
               ),
             ),
-            const SizedBox(height: 50),
+            const SizedBox(height: 40),
+
+            // --- TOMBOL SIMPAN ---
             SizedBox(
               width: double.infinity,
               height: 60,
@@ -184,7 +243,8 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                         style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)
                       ),
               ),
-            )
+            ),
+            const SizedBox(height: 20),
           ],
         ),
       ),
@@ -201,6 +261,38 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
           fontWeight: FontWeight.bold, 
           color: navyDark
         )
+      ),
+    );
+  }
+
+  // Widget helper untuk TextField biar kode gak kepanjangan
+  Widget _buildTextField(TextEditingController controller, String hint, IconData icon) {
+    return TextField(
+      controller: controller,
+      style: TextStyle(color: navyDark, fontWeight: FontWeight.w600),
+      decoration: _inputDecoration(hint).copyWith(
+        prefixIcon: Icon(icon, color: navyDark),
+      ),
+    );
+  }
+
+  InputDecoration _inputDecoration(String hint) {
+    return InputDecoration(
+      filled: true,
+      fillColor: Colors.white.withOpacity(0.5),
+      hintText: hint,
+      hintStyle: TextStyle(color: navyDark.withOpacity(0.3)),
+      border: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(20),
+        borderSide: BorderSide(color: fieldPink),
+      ),
+      enabledBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(20),
+        borderSide: BorderSide(color: fieldPink),
+      ),
+      focusedBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(20),
+        borderSide: BorderSide(color: highlightPink, width: 2),
       ),
     );
   }
